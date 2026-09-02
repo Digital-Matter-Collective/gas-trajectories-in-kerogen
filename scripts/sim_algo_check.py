@@ -34,10 +34,12 @@ DEFAULT_TRAJECTORY_COUNT = 100
 DEFAULT_STEP_COUNT = 3000
 DEFAULT_SEED = 42
 CHECKPOINT_INTERVAL = 10
+_MIGRATABLE_TRAP_EXTRACTOR_VERSION = 2
 
 FIGURE_8_ANALYZERS = ("DM", "SIB", "HYB")
 FIGURE_13_ANALYZERS = ("DM", "NP", "NP + Bayesian (SIB)")
 ERROR_CORRIDOR_QUANTILES = (0.2, 0.8)
+ERROR_CENTER = "mean"
 ERROR_SERIES_COLORS = {
     "DM": "tab:blue",
     "SIB": "tab:orange",
@@ -71,6 +73,11 @@ def _error_band(
     )
     low = np.quantile(values, q_low, axis=1)
     high = np.quantile(values, q_high, axis=1)
+    # A mean can lie outside an equal-tail quantile interval for a skewed
+    # distribution. Keep the requested percentile corridor while extending
+    # its envelope just enough to include the displayed central statistic.
+    low = np.minimum(low, central)
+    high = np.maximum(high, central)
     return low, central, high
 
 
@@ -445,7 +452,27 @@ def _load_or_initialize_checkpoint(
 
     with checkpoint_path.open("rb") as file:
         payload = pickle.load(file)
-    if not isinstance(payload, dict) or payload.get("metadata") != metadata:
+    if not isinstance(payload, dict):
+        raise RuntimeError(
+            f"Checkpoint metadata mismatch or legacy checkpoint: "
+            f"{checkpoint_path}. Rerun once with --force-recompute."
+        )
+
+    recorded_metadata = payload.get("metadata")
+    version_2_metadata = {
+        **metadata,
+        "trap_extractor_version": _MIGRATABLE_TRAP_EXTRACTOR_VERSION,
+    }
+    unversioned_metadata = {
+        key: value
+        for key, value in metadata.items()
+        if key != "trap_extractor_version"
+    }
+    migrate_k_est = recorded_metadata in (
+        version_2_metadata,
+        unversioned_metadata,
+    )
+    if recorded_metadata != metadata and not migrate_k_est:
         raise RuntimeError(
             f"Checkpoint metadata mismatch or legacy checkpoint: "
             f"{checkpoint_path}. Rerun once with --force-recompute."
@@ -458,6 +485,21 @@ def _load_or_initialize_checkpoint(
         "results": np.asarray(payload.get("results"), dtype=np.int8),
     }
     _validate_checkpoint_state(state, result_shape, step_count)
+    if migrate_k_est:
+        completed_results = state["results"].reshape(-1, step_count)[
+            : state["next_flat_index"]
+        ]
+        completed_k_est = state["k_est"].reshape(-1)
+        for index, result in enumerate(completed_results):
+            sequence = TrapExtractor.get_trap_seq(
+                result.astype(np.bool_), delta_time=1.0
+            )
+            completed_k_est[index] = estimate_trapping_probability(sequence)
+        _save_analyzer_checkpoint(checkpoint_path, metadata, state)
+        kprint(
+            f"Migrated {checkpoint_path}: recomputed k_est from cached "
+            "classification labels without rerunning the analyzer"
+        )
     return state
 
 
@@ -475,16 +517,22 @@ def _benchmark_manifest(
         "k_values": list(K_VALUES),
         "p_values": [float(value) for value in prob_grid],
         "k_est_definition": "N_t / (N_0 + N_t)",
+        "trap_extractor_version": TRAP_EXTRACTOR_VERSION,
+        "bypass_event_definition": (
+            "Each adjacent pair of inter-trap edges represents one fully "
+            "observed zero-duration trap visit; trajectory boundaries are "
+            "censored."
+        ),
         "error_metric": "relative_classification_error",
         "figure_8": {
             "algorithms": list(FIGURE_8_ANALYZERS),
-            "center": "mean",
-            "corridor": "20th-80th percentile",
+            "center": ERROR_CENTER,
+            "corridor": "20th-80th percentile envelope including the mean",
         },
         "figure_13": {
             "algorithms": list(FIGURE_13_ANALYZERS),
-            "center": "mean",
-            "corridor": "20th-80th percentile",
+            "center": ERROR_CENTER,
+            "corridor": "20th-80th percentile envelope including the mean",
         },
         "notes": (
             "SIB is implemented as NP initialization followed by Bayesian "
@@ -746,7 +794,7 @@ def run(
             },
             q_low=q_low,
             q_high=q_high,
-            center="mean",
+            center=ERROR_CENTER,
         )
 
         figure_8_path = save_error_corridor(
@@ -757,7 +805,7 @@ def run(
             title,
             q_low=q_low,
             q_high=q_high,
-            center="mean",
+            center=ERROR_CENTER,
             y_limits=shared_y_limits,
         )
         figure_13_path = save_error_corridor(
@@ -768,7 +816,7 @@ def run(
             title,
             q_low=q_low,
             q_high=q_high,
-            center="mean",
+            center=ERROR_CENTER,
             y_limits=shared_y_limits,
         )
         kprint(f"Saved Fig. 8 panel: {figure_8_path}")

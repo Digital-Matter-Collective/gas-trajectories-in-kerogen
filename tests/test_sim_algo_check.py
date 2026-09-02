@@ -92,6 +92,50 @@ def test_checkpoint_resumes_from_the_next_unprocessed_trajectory(
     assert np.all(restored["results"].reshape(-1, step_count)[:10] == 0)
 
 
+@pytest.mark.parametrize("old_version", [None, 2])
+def test_checkpoint_migrates_k_est_without_rerunning_classification(
+    tmp_path: Path,
+    old_version: int | None,
+) -> None:
+    checkpoint_path = tmp_path / "checkpoint.pkl"
+    result_shape = (1, 1)
+    step_count = 5
+    metadata = _checkpoint_metadata(
+        analyzer_name="dm",
+        k=0.5,
+        prob_grid=np.array([0.0]),
+        trajectory_count=1,
+        step_count=step_count,
+        seed=42,
+    )
+    old_metadata = metadata.copy()
+    if old_version is None:
+        old_metadata.pop("trap_extractor_version")
+    else:
+        old_metadata["trap_extractor_version"] = old_version
+    state = _empty_checkpoint(result_shape, step_count)
+    state["k_est"][0, 0] = 0.123
+    state["errors"][0, 0] = 0.1
+    state["results"][0, 0] = np.array(
+        [False, False, True, True, False], dtype=np.int8
+    )
+    state["next_flat_index"] = 1
+    _save_analyzer_checkpoint(checkpoint_path, old_metadata, state)
+
+    restored = _load_or_initialize_checkpoint(
+        checkpoint_path,
+        metadata,
+        result_shape,
+        step_count,
+        force_recompute=False,
+    )
+
+    assert restored["k_est"][0, 0] == pytest.approx(0.5)
+    with checkpoint_path.open("rb") as file:
+        migrated_payload = pickle.load(file)
+    assert migrated_payload["metadata"] == metadata
+
+
 def test_seed_and_figure_contract_are_saved_without_code_fingerprint() -> None:
     manifest = _benchmark_manifest(
         seed=42,
@@ -106,8 +150,11 @@ def test_seed_and_figure_contract_are_saved_without_code_fingerprint() -> None:
     figure_13 = cast(dict, manifest["figure_13"])
     assert tuple(figure_8["algorithms"]) == FIGURE_8_ANALYZERS
     assert tuple(figure_13["algorithms"]) == FIGURE_13_ANALYZERS
-    assert figure_8["corridor"] == "20th-80th percentile"
-    assert figure_13["corridor"] == "20th-80th percentile"
+    assert figure_8["center"] == "mean"
+    assert figure_13["center"] == "mean"
+    expected_corridor = "20th-80th percentile envelope including the mean"
+    assert figure_8["corridor"] == expected_corridor
+    assert figure_13["corridor"] == expected_corridor
     assert "fingerprint" not in manifest
     assert "version" not in manifest
 
@@ -182,3 +229,18 @@ def test_shared_error_axis_includes_every_displayed_series() -> None:
 
     assert lower == 0.0
     assert upper > 0.66
+
+
+def test_mean_center_stays_inside_percentile_envelope_for_skewed_data() -> None:
+    values = np.array([[0.0] * 9 + [1.0]])
+
+    low, central, high = _error_band(
+        values,
+        q_low=0.2,
+        q_high=0.8,
+        center="mean",
+    )
+
+    assert low[0] <= central[0] <= high[0]
+    assert central[0] == pytest.approx(values.mean(axis=1)[0])
+    assert high[0] == pytest.approx(central[0])

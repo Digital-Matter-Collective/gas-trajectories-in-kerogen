@@ -3,12 +3,10 @@ import numpy as np
 from base.trap_sequence import TrapSequence
 from utils.types import NPBArray
 
-# Bump when get_trap_seq's run-encoding changes, so callers that cache its
-# output (e.g. scripts/trap_distr_builder.py) invalidate stale seq/traps
-# caches computed with a previous, possibly buggy, version instead of
-# silently trusting them (P1-08: fixed a boundary-counting bug that biased
-# N0/Nt/k_est).
-TRAP_EXTRACTOR_VERSION = 2
+# Bump when get_trap_seq's event encoding changes, so callers invalidate
+# stale derived values. Version 3 fixes the version-2 regression that counted
+# free runs rather than fully observed bypass visits and forced k_est to 0.5.
+TRAP_EXTRACTOR_VERSION = 3
 
 
 class TrapExtractor:
@@ -17,15 +15,15 @@ class TrapExtractor:
         """Collapse `edge_traps` into one (duration, count) entry per run.
 
         Each maximal run of consecutive trapped edges becomes one non-zero
-        entry (duration = run_length * delta_time, count = run_length + 1,
-        keeping the pre-existing "count the exit edge too" convention for
-        trap-duration statistics used by the power-law fit). Each maximal
-        run of consecutive free edges becomes exactly one zero-duration
-        entry. There is no artificial boundary entry: `N0`/`Nt` (derived
-        from how many entries have times == 0 vs > 0 — see
-        `TrapSequence.get_zero_trap_count`/`get_non_zero_trap_count`) equal
-        the number of free/trapped runs actually observed, so an all-trapped
-        or all-free trajectory yields `k_est` of exactly 1.0 or 0.0.
+        entry (duration = run_length * delta_time, count = run_length + 1).
+
+        A run of ``L`` free/inter-trap edges contains ``L - 1`` fully
+        observed zero-duration visits: every adjacent free/free pair means
+        that the intermediate trap was bypassed.  The trajectory boundaries
+        are censored, so no artificial zero-duration event is added at either
+        end.  Collapsing a free run to one event would make free and trapped
+        run counts alternate and force ``k_est`` towards 0.5 independently
+        of the actual capture frequency.
         """
         if len(edge_traps) == 0:
             raise ValueError("edge_traps must not be empty")
@@ -41,8 +39,11 @@ class TrapExtractor:
                 times.append(length * delta_time)
                 traps.append(length + 1)
             else:
-                times.append(0.0)
-                traps.append(length)
+                # L transition edges delimit L - 1 complete intermediate
+                # trap visits.  The visits outside the observed trajectory
+                # are unknown and must not be invented as boundary events.
+                times.extend([0.0] * (length - 1))
+                traps.extend([1] * (length - 1))
 
         for i in range(1, len(edge_traps)):
             value = bool(edge_traps[i])

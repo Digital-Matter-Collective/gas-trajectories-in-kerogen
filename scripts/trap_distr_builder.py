@@ -29,11 +29,12 @@ from processes.trajectory_analyzer.sib import (
     StructureInformedBayesParams,
 )
 from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
-from utils.cache_manifest import check_cache, write_manifest
+from utils.cache_manifest import check_cache, file_fingerprint, write_manifest
 from utils.types import f32
 from utils.utils import kprint
 
 _TABLE_III_HISTOGRAM_BINS = 50
+_LEGACY_COUPLED_TRAP_EXTRACTOR_VERSION = 2
 
 
 @dataclass(frozen=True)
@@ -387,59 +388,85 @@ def run(
             seq_file = Path(join(cur_pts, f"seq_{step * i}.pickle"))
             traps_file = Path(join(cur_pts, f"traps_{step * i}.pickle"))
 
-            cache_metadata = {
+            analyzer_cache_metadata = {
                 "gas": gas,
                 "step": step,
                 "trajectory_index": i,
                 "prefix": prefix,
                 "struct_params": struct_params,
                 "prob_np_params": prob_np_params,
-                "trap_extractor_version": TRAP_EXTRACTOR_VERSION,
             }
-            use_cache = (
-                seq_file.is_file()
-                and traps_file.is_file()
-                and prefix not in recompute_prefixes
+            use_traps_cache = (
+                traps_file.is_file() and prefix not in recompute_prefixes
             )
-            cache_status = (
-                check_cache(traps_file, cache_metadata)
-                if use_cache
+            traps_cache_status = (
+                check_cache(traps_file, analyzer_cache_metadata)
+                if use_traps_cache
                 else "missing"
             )
-            if cache_status == "mismatch":
-                kprint(
-                    f"Cache {traps_file} does not match current parameters; recomputing"
-                )
-                use_cache = False
+            migrate_coupled_manifest = False
+            if traps_cache_status == "mismatch":
+                # Extractor v2 incorrectly coupled the derived TrapSequence
+                # version to the expensive analyzer-output cache.  Accept
+                # that exact manifest once, then rewrite it using only the
+                # inputs that can actually change ``traps``.
+                legacy_metadata = {
+                    **analyzer_cache_metadata,
+                    "trap_extractor_version": (
+                        _LEGACY_COUPLED_TRAP_EXTRACTOR_VERSION
+                    ),
+                }
+                if check_cache(traps_file, legacy_metadata) == "match":
+                    migrate_coupled_manifest = True
+                else:
+                    use_traps_cache = False
 
-            if not use_cache:
+            if not use_traps_cache:
+                kprint(
+                    f"Cache {traps_file} does not match current analyzer "
+                    "parameters; recomputing"
+                )
                 if prefix == "HYB":
                     approx_traps = results[("DM", i)]
                     hybrid_analyzer.set_trap_approx(approx_traps)
 
                 start_time = time.time()
                 traps = analyzer.run(trj)
-                seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
                 print(
                     f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
                 )
-                with open(seq_file, 'wb') as handle:
-                    pickle.dump(seq, handle)
                 with open(traps_file, 'wb') as handle:
                     pickle.dump(traps, handle)
-                write_manifest(traps_file, cache_metadata)
+                write_manifest(traps_file, analyzer_cache_metadata)
             else:
-                if cache_status == "legacy":
+                if traps_cache_status == "legacy":
                     kprint(
                         f"Upgrading legacy cache {traps_file} to "
                         "provenance-tracked format (trusted as-is, not recomputed)"
                     )
-                with open(seq_file, 'rb') as fp:
-                    seq = pickle.load(fp)
                 with open(traps_file, 'rb') as fp:
                     traps = pickle.load(fp)
-                if cache_status == "legacy":
-                    write_manifest(traps_file, cache_metadata)
+                if traps_cache_status == "legacy" or migrate_coupled_manifest:
+                    write_manifest(traps_file, analyzer_cache_metadata)
+
+            sequence_cache_metadata = {
+                "trap_extractor_version": TRAP_EXTRACTOR_VERSION,
+                "delta_time_sec": trj.delta_time_sec,
+                "traps_file": file_fingerprint(traps_file),
+            }
+            use_sequence_cache = (
+                seq_file.is_file()
+                and prefix not in recompute_prefixes
+                and check_cache(seq_file, sequence_cache_metadata) == "match"
+            )
+            if use_sequence_cache:
+                with open(seq_file, 'rb') as fp:
+                    seq = pickle.load(fp)
+            else:
+                seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
+                with open(seq_file, 'wb') as handle:
+                    pickle.dump(seq, handle)
+                write_manifest(seq_file, sequence_cache_metadata)
             results[(prefix, i)] = np.copy(traps)
 
             trap_list.append(seq)

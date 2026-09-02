@@ -282,13 +282,22 @@ The command writes:
 - `errors/synthetic_benchmark_manifest.json`: seed, grid, and figure series;
 - `errors/trajectories` and `errors/checkpoints`: resumable caches.
 
-Both figures show the mean classification error with a 20th–80th percentile
-corridor. For each `k`, they use the same Y limits and stable per-algorithm
-colors, so the shared DM and SIB/NP+Bayesian series are directly comparable.
+Both figures show the mean classification error. Their shaded envelope spans
+the 20th–80th percentile corridor and is extended to include the mean wherever
+a skewed error distribution places the arithmetic mean outside that equal-tail
+interval. For each `k`, the figures use the same Y limits and stable
+per-algorithm colors, so the shared DM and SIB/NP+Bayesian series are directly
+comparable.
 
 The seed deterministically controls both NumPy and Python random generators.
 For each trajectory, the estimated trapping probability is
 `k_est = N_t / (N_0 + N_t)`.
+Here, each maximal run of intra-trap edges contributes one capture event to
+`N_t`. Within a run of `L` consecutive inter-trap edges, the `L - 1` adjacent
+edge pairs delimit fully observed zero-duration trap visits and contribute
+`L - 1` bypass events to `N_0`. Events outside the two trajectory boundaries
+are unobserved and are not invented. Counting free and trapped runs instead
+would force `k_est` towards 0.5 because those runs necessarily alternate.
 
 ## 8. Table III: trapping-time distributions
 
@@ -327,6 +336,12 @@ The shared directory receives `table_iii_trapping_summary.csv` and `.json`;
 rows are updated by gas and classifier without removing the other gas. Cached
 step labels and trap sequences are stored under each dataset's `traps/DM`,
 `traps/SIB`, and `traps/HYB` directories.
+
+The event definitions for `N_t`, `N_0`, and `k_est` are the same as in the
+synthetic benchmark above. Analyzer labels (`traps_*.pickle`) and derived
+event sequences (`seq_*.pickle`) have separate provenance manifests, so a
+change to event encoding rebuilds only the inexpensive sequences and summary,
+not the DM/SIB/HYB classifications.
 
 To replace only HYB after an algorithm change:
 
