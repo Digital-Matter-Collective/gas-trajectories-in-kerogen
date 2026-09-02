@@ -1,0 +1,79 @@
+import sys
+import os
+from pathlib import Path
+from os import listdir
+from os.path import realpath, join, isfile
+import time
+from typing import List, Tuple
+import numpy as np
+import argparse
+import networkx as nx
+import json
+from scipy import ndimage
+import subprocess
+
+from base.boundingbox import BoundingBox, Range
+from base.reader import Reader
+from visualizer.visualizer import Visualizer
+
+
+def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
+    r, tl, ll, positions = Reader.read_pnm_ext_data(pnm_path)
+
+    colors_data = {
+        0: (0.36, 0.16, 0.53, 1.0),
+    }
+    scales_data = {i: rad for i, rad in enumerate(r)}
+
+    node_pos = {idx: pos for idx, pos in enumerate(positions)}
+
+    bord = positions.max(axis=0)
+    bbox = BoundingBox(
+        Range(0, bord[0]),
+        Range(0, bord[1]),
+        Range(0, bord[2]),
+    )
+
+    graph = nx.Graph()
+    graph.add_nodes_from(
+        [(i, {"color_id": 0, "scale_id": i}) for i, _ in enumerate(r)]
+    )
+    graph.add_weighted_edges_from(
+        [(l[0], l[1], tl[i, 0]) for i, l in enumerate(ll)]
+    )
+
+    float_img = np.load(path_to_img)
+    float_img = ndimage.gaussian_filter(float_img, 4)
+    float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
+    float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
+    print(float_img.mean(), float_img.min(), float_img.max())
+
+    rad = tl[:, 0].mean()
+
+    Visualizer.draw_graph_and_img(  # type: ignore
+        graph,
+        float_img,
+        node_pos,
+        bbox,
+        size_node=0.8,
+        size_edge=rad,
+        colors_data=colors_data,
+        scales_data=scales_data,
+        scale='non',
+        isovalue=0.1,
+        volume_mode=False,
+        img_opacity=1,
+    )
+    Visualizer.show()
+
+
+if "__main__" == __name__:
+    parser = argparse.ArgumentParser(description="Visualize PNM and structure image")
+    parser.add_argument("img", type=Path, help="Float image .npy file")
+    parser.add_argument("pnm_prefix", type=Path, help="PNM files prefix (without _node1.dat etc.)")
+    args = parser.parse_args()
+
+    read_and_draw_pnm_and_img(
+        str(args.pnm_prefix),
+        str(args.img),
+    )

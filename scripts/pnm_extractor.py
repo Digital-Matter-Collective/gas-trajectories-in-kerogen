@@ -1,0 +1,113 @@
+import argparse
+import json
+import re
+import subprocess
+from os import listdir
+from os.path import dirname, isfile, join, realpath
+from pathlib import Path
+
+from utils.utils import get_float_img_pattern, kprint
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description="Extract PNM from binary images"
+    )
+    parser.add_argument(
+        "path", type=Path, help="Data directory (contains raw_images/)"
+    )
+    parser.add_argument("extractor", type=Path, help="Path to extractor binary")
+    parser.add_argument(
+        "config", type=Path, help="Path to extractor config JSON"
+    )
+
+    args = parser.parse_args()
+
+    path_to_extractor = str(args.extractor)
+    path_to_config = str(args.config)
+    default_path = str(args.path)
+
+    pnm_path = join(default_path, "pnm")
+    raw_img_path = join(default_path, "raw_images")
+    euler_path = join(default_path, "euler.json")
+
+    Path(pnm_path).mkdir(parents=True, exist_ok=True)
+
+    # Opening JSON file
+    with open(path_to_config) as f:
+        # returns JSON object as
+        # a dictionary
+        jconfig = json.load(f)
+
+    onlyfiles = [
+        f
+        for f in listdir(raw_img_path)
+        if isfile(join(raw_img_path, f)) and '.raw' in f
+    ]
+
+    pattern = get_float_img_pattern()
+
+    for i, file in enumerate(onlyfiles):
+
+        match = pattern.match(file)
+        if not match:
+            kprint("No match")
+            continue
+        data = match.groupdict()
+        num = data["step"]
+        x_min = data["x_min"]
+        x_max = data["x_max"]
+        y_min = data["y_min"]
+        y_max = data["y_max"]
+        z_min = data["z_min"]
+        z_max = data["z_max"]
+        resolution = float(data["resolution"])
+
+        xs = int(round((float(x_max) - float(x_min)) / resolution))
+        ys = int(round((float(y_max) - float(y_min)) / resolution))
+        zs = int(round((float(z_max) - float(z_min)) / resolution))
+
+        path_to_images = join(raw_img_path, file)
+        path_to_pnm = join(pnm_path, file)
+
+        nm_to_um = 0.001
+
+        pnm_pref = join(pnm_path, "pnm-" + file[11:-4])
+        if isfile(pnm_pref + "_node1.dat"):
+            kprint(f"Skip {num}")
+            continue
+
+        jconfig["input_data"]["filename"] = path_to_images
+        jconfig["input_data"]["size"]["x"] = xs
+        jconfig["input_data"]["size"]["y"] = ys
+        jconfig["input_data"]["size"]["z"] = zs
+        jconfig["output_data"]["statoil_prefix"] = pnm_pref
+        jconfig["output_data"]["filename"] = pnm_pref
+        jconfig["extraction_parameters"]["resolution"] = resolution * nm_to_um
+        jconfig["extraction_parameters"]["length_unit_type"] = "UM"
+
+        kprint(f"File name:{join(path_to_images)}")
+        kprint(f"Size: {xs}, {ys}, {zs}")
+        kprint(f"Output name: {pnm_pref}")
+        kprint(f"Resolution: {resolution} nm ({resolution * nm_to_um} um)")
+
+        with open(path_to_config, "w") as outfile:
+            json.dump(jconfig, outfile)
+        kprint(f"run: {path_to_extractor} {path_to_config}")
+
+        process = subprocess.Popen(
+            [
+                path_to_extractor,
+                path_to_config,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        # wait for the process to terminate
+        out, err = process.communicate()
+        errcode = process.returncode
+        if errcode != 0:
+            kprint(err.decode("utf-8"))
+            break
+        else:
+            kprint(f"Sucssess: {pnm_pref}")
+            kprint(f"Ready index = {i+1} from {len(onlyfiles)}")

@@ -1,0 +1,95 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gas-trajectories-in-kerogen"
+version = "0.0.1"
+description = "Trajectory analysis for gas transport in kerogen"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Andrey Ananev"},
+    {name = "Maria Potapova"},
+    {name = "Timur Vostroknutov"},
+    {name = "Nikolay Kondratyuk"},
+    {name = "Aleksey Khlyupin"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = [
+    "joblib>=1.5,<1.6",
+    "matplotlib>=3.10,<3.11",
+    "networkx>=3.6,<3.7",
+    "numba>=0.63,<0.64",
+    "numpy>=2.3,<2.4",
+    "pandas>=2.3,<2.4",
+    "scikit-image>=0.26,<0.27",
+    "scikit-learn>=1.8,<1.9",
+    "scipy>=1.16,<1.17",
+    "seaborn>=0.13,<0.14",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=9,<10"]
+visualization = ["vtk>=9.6,<9.7"]
+
+[project.urls]
+Repository = "https://github.com/Digital-Matter-Collective/gas-trajectories-in-kerogen"
+Issues = "https://github.com/Digital-Matter-Collective/gas-trajectories-in-kerogen/issues"
+
+[project.scripts]
+gas-traj-data-manifest = "scripts.build_data_release_manifest:main"
+gas-traj-dm-search = "scripts.cli:dm_search"
+gas-traj-find-dm-params = "scripts.cli:find_dm_params"
+gas-traj-synthetic-benchmark = "scripts.cli:synthetic_benchmark"
+gas-traj-trap-distributions = "scripts.cli:trap_distributions"
+gas-traj-stationarity = "scripts.cli:stationarity"
+gas-traj-extract-gas-trajectory = "scripts.extract_gas_trajectory_to_file:main"
+gas-traj-extract-krg-trajectory = "scripts.extract_krg_trajectory_to_file:main"
+gas-traj-extract-structures = "scripts.dynamic_struct_extractor:main"
+gas-traj-binarize-structures = "scripts.binarization_structs:main"
+gas-traj-distance-maps = "scripts.distance_map_structs:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "base*",
+    "list_threshold*",
+    "processes*",
+    "scripts*",
+    "utils*",
+    "visualizer*",
+]
+namespaces = false
+
+[tool.setuptools.package-data]
+list_threshold = ["*.pkl"]
+
+[tool.black]
+line-length = 80
+target-version = ['py314']
+skip-string-normalization = true
+verbose = true
+
+[tool.isort]
+profile = 'black'
+skip_gitignore = true
+line_length = 80
+order_by_type = true
+include_trailing_comma = true
+
+[tool.mypy]
+disallow_any_generics = true
+disallow_untyped_defs = true
+python_version = "3.14"
+plugins = [
+  "numpy.typing.mypy_plugin"
+]

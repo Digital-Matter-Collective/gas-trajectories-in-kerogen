@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash -l {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install headless VTK/OpenGL support
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libgl1-mesa-dev libosmesa6
+
+      - name: Set up conda environment
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          environment-file: environment.yml
+          activate-environment: kerogen
+          channels: conda-forge,defaults
+          channel-priority: flexible
+          auto-update-conda: true
+
+      - name: Lint, type-check and test (tools/check.sh)
+        run: xvfb-run -a bash tools/check.sh
+
+      - name: Console-script smoke tests
+        run: |
+          for cmd in \
+            gas-traj-data-manifest \
+            gas-traj-dm-search \
+            gas-traj-find-dm-params \
+            gas-traj-synthetic-benchmark \
+            gas-traj-trap-distributions \
+            gas-traj-stationarity \
+            gas-traj-extract-gas-trajectory \
+            gas-traj-extract-krg-trajectory \
+            gas-traj-extract-structures \
+            gas-traj-binarize-structures \
+            gas-traj-distance-maps; do
+            echo "::group::$cmd --help"
+            "$cmd" --help
+            echo "::endgroup::"
+          done

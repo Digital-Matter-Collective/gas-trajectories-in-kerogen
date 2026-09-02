@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: gas-trajectories-in-kerogen
+abstract: >-
+  Trajectory analysis of gas molecules in kerogen pore structures: trapping-event
+  classification (distance-matrix, Neyman-Pearson, Bayesian and hybrid analyzers),
+  pore-network-model statistics, and the synthetic benchmarks used to validate them.
+version: 0.0.1
+authors:
+  - family-names: Ananev
+    given-names: Andrey
+  - family-names: Potapova
+    given-names: Maria
+  - family-names: Vostroknutov
+    given-names: Timur
+  - family-names: Kondratyuk
+    given-names: Nikolay
+  - family-names: Khlyupin
+    given-names: Aleksey
+repository-code: "https://github.com/Digital-Matter-Collective/gas-trajectories-in-kerogen"
+license: MIT
