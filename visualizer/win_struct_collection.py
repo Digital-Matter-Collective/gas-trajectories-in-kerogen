@@ -1,15 +1,17 @@
+import sys
+from os.path import realpath
+from pathlib import Path
+
 from vtkmodules.vtkRenderingCore import (
     vtkRenderWindowInteractor,
 )
-import sys
-from pathlib import Path
-from os.path import realpath
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from visualizer.interactor_styles import KeyPressInteractorStyle
+from visualizer.interactor_styles import KeyPressInteractorStyle  # noqa: E402
+
 
 class WinStructCollection:
     def __init__(self, interactor: vtkRenderWindowInteractor):
@@ -19,6 +21,6 @@ class WinStructCollection:
         self.interactor.SetInteractorStyle(self.kpis)
         self.running = True
 
-    def clear(self)->None:
+    def clear(self) -> None:
         self.renWin.Finalize()
         del self.renWin, self.interactor

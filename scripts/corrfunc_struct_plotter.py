@@ -1,16 +1,15 @@
 import argparse
-import os
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from itertools import repeat
 from pathlib import Path
-from typing import List
+from typing import List, cast
 
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-import numpy as np
 from scipy.stats import linregress
 
 from base.trajectory import Trajectory
@@ -96,7 +95,7 @@ def plot_corrfunc_and_md(
         label=r"$C(t)$",
     )
     ax1.set_xlabel(r"Time delay, $\mu$s", fontsize=20)
-    
+
     ax1.yaxis.set_major_formatter(FormatStrFormatter("%.2f"))
     ax1.tick_params(axis="both", labelsize=16)
     ax1.tick_params(axis="y", labelcolor=color_ct)
@@ -178,7 +177,7 @@ def plot_corrfunc_and_md(
         ax2.set_ylim(bottom=0.09)
         ax2.set_ylim(top=max(positive_r) * 10)
 
-    labels = [line.get_label() for line in lines]
+    labels = [str(line.get_label()) for line in lines]
     ax1.legend(
         lines,
         labels,
@@ -360,7 +359,7 @@ def main() -> None:
         img = np.load(file_name, mmap_mode="r")
         if pore_mode:
             img = 1 - img
-        return img.astype(np.int8)
+        return cast(np.ndarray, img.astype(np.int8))
 
     ct_file.parent.mkdir(parents=True, exist_ok=True)
     dt, C_t = correlation_average_time(

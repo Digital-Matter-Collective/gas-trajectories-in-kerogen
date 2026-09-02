@@ -7,6 +7,7 @@ import random
 import time
 from os.path import isfile, join
 from pathlib import Path
+from typing import Protocol
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -41,7 +42,7 @@ def get_struct_params() -> DistanceMatrixParams:
         nu=0.1,
         diag_percentile=10,
         kernel_size=2,
-        list_mu=[0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+        list_mu=np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]),
         p_value=0.9,
     )
 
@@ -62,7 +63,9 @@ def build_analyzers(pil_gamma_fitter, throat_lengths_weibull_fitter):
         (DistanceMatrixAnalyzer(get_struct_params()), "DM"),
         (
             StructureInformedBayesAnalyzer(
-                get_prob_params(), pil_gamma_fitter, throat_lengths_weibull_fitter
+                get_prob_params(),
+                pil_gamma_fitter,
+                throat_lengths_weibull_fitter,
             ),
             "SIB",
         ),
@@ -87,8 +90,16 @@ def environment_metadata() -> dict:
     }
 
 
+class WalkSimulator(Protocol):
+    """Structural type for `measure_complexity`'s simulator argument: only
+    `run(length)` is used, so any object with that method works, including
+    test doubles that don't subclass `KerogenWalkSimulator`."""
+
+    def run(self, length: int) -> object: ...
+
+
 def measure_complexity(
-    simulator: KerogenWalkSimulator,
+    simulator: WalkSimulator,
     analyzers: list,
     trajectory_lengths: np.ndarray,
     repeats: int,
@@ -215,18 +226,29 @@ if __name__ == '__main__':
 
     fit_summary = []
 
-    def add_plot(mean_atime: np.ndarray, std_atime: np.ndarray, name: str) -> None:
+    def add_plot(
+        mean_atime: np.ndarray, std_atime: np.ndarray, name: str
+    ) -> None:
         logx = np.log(plot_lengths)
         logy = np.log(mean_atime)
         p = np.polyfit(logx, logy, deg=1)
         fit_summary.append(
-            {"analyzer": name, "log_log_slope": float(p[0]), "log_log_intercept": float(p[1])}
+            {
+                "analyzer": name,
+                "log_log_slope": float(p[0]),
+                "log_log_intercept": float(p[1]),
+            }
         )
         print(f"{name}: p = {p}")
 
         errorbar = plt.errorbar(
-            plot_lengths, mean_atime, yerr=std_atime, fmt='o', markersize=5,
-            alpha=0.35, capsize=3,
+            plot_lengths,
+            mean_atime,
+            yerr=std_atime,
+            fmt='o',
+            markersize=5,
+            alpha=0.35,
+            capsize=3,
         )
         color = errorbar.lines[0].get_color()
         plt.plot(

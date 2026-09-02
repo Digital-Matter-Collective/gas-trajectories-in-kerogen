@@ -1,6 +1,6 @@
+from vtkmodules.vtkCommonCore import vtkCommand
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
 from vtkmodules.vtkRenderingCore import vtkRenderWindowInteractor
-
 
 
 class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
@@ -18,9 +18,9 @@ class KeyPressInteractorStyle(vtkInteractorStyleTrackballCamera):
             .GetActiveCamera()
         )
         self.camera_default_position = self.camera.GetPosition()
-        self.AddObserver('KeyPressEvent', self.key_press_event)
+        self.AddObserver(vtkCommand.KeyPressEvent, self.key_press_event)
 
-    def key_press_event(self, obj, event) -> None: # type: ignore
+    def key_press_event(self, obj, event) -> None:  # type: ignore
         key = self.iren.GetKeySym().lower()
         if key == 'q':
             self.status = False

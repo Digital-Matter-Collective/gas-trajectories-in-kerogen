@@ -26,9 +26,9 @@ class _ConstantFitter:
 
 
 def _make_trajectory(n: int = 12) -> Trajectory:
-    points = np.cumsum(
-        np.ones((n, 3), dtype=np.float32) * 0.1, axis=0
-    ).astype(np.float32)
+    points = np.cumsum(np.ones((n, 3), dtype=np.float32) * 0.1, axis=0).astype(
+        np.float32
+    )
     times = np.arange(n, dtype=np.float32)
     box = BoundingBox(Range(0, 100), Range(0, 100), Range(0, 100))
     return Trajectory(points=points, times=times, box=box)
@@ -44,7 +44,9 @@ def test_analyze_does_not_warn_or_produce_nan_when_both_densities_are_zero() -> 
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        likelihood = NeymanPearsonAnalyzer.analyze(trj, _ZeroFitter(), _ZeroFitter())
+        likelihood = NeymanPearsonAnalyzer.analyze(
+            trj, _ZeroFitter(), _ZeroFitter()
+        )
 
     assert np.all(np.isfinite(likelihood))
 
@@ -78,7 +80,9 @@ def test_calculate_threshold_within_default_range_still_works() -> None:
     assert threshold > 0
 
 
-def test_calculate_threshold_default_x_max_fails_for_support_beyond_1nm() -> None:
+def test_calculate_threshold_default_x_max_fails_for_support_beyond_1nm() -> (
+    None
+):
     # Regression check for the bug itself: with support entirely beyond
     # 1 nm, the default [0, 1] search window finds essentially no
     # probability mass and cannot locate a threshold.

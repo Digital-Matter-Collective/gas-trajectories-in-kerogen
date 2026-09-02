@@ -32,7 +32,7 @@ import os
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 MANIFEST_SCHEMA_VERSION = 1
 
@@ -64,7 +64,7 @@ def read_manifest(cache_path: Path) -> dict[str, Any] | None:
     if not path.is_file():
         return None
     with path.open("r", encoding="utf-8") as file:
-        return json.load(file)
+        return cast(dict[str, Any], json.load(file))
 
 
 def check_cache(cache_path: Path, metadata: dict[str, Any]) -> CacheStatus:
@@ -99,7 +99,9 @@ def write_manifest(cache_path: Path, metadata: dict[str, Any]) -> Path:
     return target
 
 
-def path_fingerprint(directory: Path, *, suffix: str | None = None) -> dict[str, Any]:
+def path_fingerprint(
+    directory: Path, *, suffix: str | None = None
+) -> dict[str, Any]:
     """Cheap content fingerprint of a directory: sorted file names and sizes.
 
     Used to detect "the input directory changed" without hashing large
@@ -110,9 +112,7 @@ def path_fingerprint(directory: Path, *, suffix: str | None = None) -> dict[str,
         for path in directory.iterdir()
         if path.is_file() and (suffix is None or path.name.endswith(suffix))
     )
-    sizes = [
-        (directory / name).stat().st_size for name in entries
-    ]
+    sizes = [(directory / name).stat().st_size for name in entries]
     return {
         "directory": str(directory),
         "file_count": len(entries),

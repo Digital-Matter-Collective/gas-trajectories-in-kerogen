@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Any, Tuple
 
 import numpy as np
 import numpy.typing as npt
@@ -7,8 +7,8 @@ f64 = np.float64
 f32 = np.float32
 i64 = np.int64
 i32 = np.int32
-NPFArray = npt.NDArray[f32]
-NPIArray = npt.NDArray[i64]
+NPFArray = npt.NDArray[np.floating[Any]]
+NPIArray = npt.NDArray[np.integer[Any]]
 NPBArray = npt.NDArray[np.bool_]
 NPUIArray = npt.NDArray[np.uint8]
 NPDTArray = npt.NDArray[np.datetime64]

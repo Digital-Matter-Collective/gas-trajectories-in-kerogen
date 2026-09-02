@@ -3,36 +3,35 @@ import csv
 import json
 import os
 import pickle
-from dataclasses import asdict, dataclass, fields
-from os.path import join, isfile
-from pathlib import Path
 import time
+from dataclasses import asdict, dataclass, fields
+from os.path import isfile, join
+from pathlib import Path
 from typing import Dict, Optional, Sequence, Set, Tuple
+
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+from scipy.stats import linregress
+
 from base.trajectory import Trajectory
 from base.trap_sequence import TrapSequence
-from utils.types import f32
-from processes.trajectory_analyzer.hybrid import (
-    HybridParams,
-    HybridAnalyzer,
-)
 from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
+)
+from processes.trajectory_analyzer.hybrid import (
+    HybridAnalyzer,
+    HybridParams,
 )
 from processes.trajectory_analyzer.sib import (
     StructureInformedBayesAnalyzer,
     StructureInformedBayesParams,
 )
-from processes.trajectory_analyzer.dm import (
-    DistanceMatrixParams,
-)
 from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
 from utils.cache_manifest import check_cache, write_manifest
+from utils.types import f32
 from utils.utils import kprint
-from scipy.stats import linregress
-
 
 _TABLE_III_HISTOGRAM_BINS = 50
 
@@ -77,7 +76,9 @@ class TableIIIRow:
     fit_std_err: float
 
 
-def summarize_trap_events(trap_list: Sequence[TrapSequence]) -> TrapEventSummary:
+def summarize_trap_events(
+    trap_list: Sequence[TrapSequence],
+) -> TrapEventSummary:
     """Calculate the event statistics reported in Table III."""
     if not trap_list:
         raise ValueError("At least one trap sequence is required")
@@ -400,7 +401,11 @@ def run(
                 and traps_file.is_file()
                 and prefix not in recompute_prefixes
             )
-            cache_status = check_cache(traps_file, cache_metadata) if use_cache else "missing"
+            cache_status = (
+                check_cache(traps_file, cache_metadata)
+                if use_cache
+                else "missing"
+            )
             if cache_status == "mismatch":
                 kprint(
                     f"Cache {traps_file} does not match current parameters; recomputing"

@@ -35,7 +35,9 @@ def test_same_trajectories_are_shared_across_analyzers_per_length() -> None:
     analyzers = [(dm, "DM"), (sib, "SIB")]
     trajectory_lengths = np.array([100, 200])
 
-    measure_complexity(simulator, analyzers, trajectory_lengths, repeats=3, seed=1)
+    measure_complexity(
+        simulator, analyzers, trajectory_lengths, repeats=3, seed=1
+    )
 
     # One warm-up call plus 3 repeats per length.
     assert simulator.calls == [WARMUP_LENGTH, 100, 100, 100, 200, 200, 200]
@@ -44,14 +46,18 @@ def test_same_trajectories_are_shared_across_analyzers_per_length() -> None:
     # not independently drawn ones (P1-07: same inputs across methods).
     dm_by_length = [t for t in dm.seen_trajectories if t.length == 100]
     sib_by_length = [t for t in sib.seen_trajectories if t.length == 100]
-    assert [t.draw_index for t in dm_by_length] == [t.draw_index for t in sib_by_length]
+    assert [t.draw_index for t in dm_by_length] == [
+        t.draw_index for t in sib_by_length
+    ]
 
 
 def test_warmup_runs_once_per_analyzer_before_timed_region() -> None:
     simulator = _FakeSimulator()
     dm = _FakeAnalyzer("DM")
 
-    measure_complexity(simulator, [(dm, "DM")], np.array([50]), repeats=2, seed=1)
+    measure_complexity(
+        simulator, [(dm, "DM")], np.array([50]), repeats=2, seed=1
+    )
 
     # First trajectory seen by the analyzer is the untimed warm-up one.
     assert dm.seen_trajectories[0].length == WARMUP_LENGTH
@@ -63,7 +69,9 @@ def test_output_shape_is_lengths_by_analyzers_by_repeats() -> None:
     analyzers = [(_FakeAnalyzer("DM"), "DM"), (_FakeAnalyzer("SIB"), "SIB")]
     trajectory_lengths = np.array([10, 20, 30])
 
-    times = measure_complexity(simulator, analyzers, trajectory_lengths, repeats=4, seed=1)
+    times = measure_complexity(
+        simulator, analyzers, trajectory_lengths, repeats=4, seed=1
+    )
 
     assert times.shape == (3, 2, 4)
     assert np.all(times >= 0)
@@ -72,7 +80,6 @@ def test_output_shape_is_lengths_by_analyzers_by_repeats() -> None:
 def test_seed_makes_simulation_reproducible() -> None:
     class _SeededFakeSimulator:
         def __init__(self) -> None:
-            import random
 
             self.draws: list[float] = []
 

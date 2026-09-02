@@ -1,18 +1,17 @@
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Optional, Tuple
+
 import numpy as np
 
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
     GammaFitter,
+    PdfFitter,
     WeibullFitter,
 )
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-
+from utils.types import NPBArray, NPFArray
 from utils.utils import pdistances
-from utils.types import NPFArray, NPBArray
-
 
 DEFAULT_MAX_EM_ITERATIONS = 1000
 
@@ -56,8 +55,8 @@ class BayesAnalyzer(TrajectoryAnalyzer):
     @staticmethod
     def analyze(
         trj: Trajectory,
-        transition_step_fitter: WeibullFitter,
-        trapped_step_fitter: GammaFitter,
+        transition_step_fitter: PdfFitter,
+        trapped_step_fitter: PdfFitter,
         critical_probability: float,
         p_trap: float = 0.5,
         max_iter: int = DEFAULT_MAX_EM_ITERATIONS,

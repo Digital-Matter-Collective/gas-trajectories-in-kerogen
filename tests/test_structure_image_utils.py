@@ -36,7 +36,9 @@ def test_collect_indexes_deduplicates_and_requires_at_least_one() -> None:
         collect_indexes([], None)
 
 
-def test_generate_indexes_by_mode_all_returns_exact_count_with_endpoints() -> None:
+def test_generate_indexes_by_mode_all_returns_exact_count_with_endpoints() -> (
+    None
+):
     # Reproduces the P1-05 report: 6,560-step trajectory, 500 requested
     # structures must not silently become 501.
     indexes = generate_indexes_by_mode(
@@ -53,7 +55,9 @@ def test_generate_indexes_by_mode_all_returns_exact_count_with_endpoints() -> No
     assert indexes[-1] == 25000 + 250000 * 6560
 
 
-def test_generate_indexes_by_mode_all_handles_fewer_positions_than_requested() -> None:
+def test_generate_indexes_by_mode_all_handles_fewer_positions_than_requested() -> (
+    None
+):
     # Only 11 distinct integer positions exist between 0 and 10 inclusive.
     indexes = generate_indexes_by_mode(
         start_step=0,
@@ -79,7 +83,9 @@ def test_generate_indexes_by_mode_all_single_structure_is_the_start() -> None:
     assert indexes == [25000]
 
 
-def test_generate_indexes_by_mode_part_returns_first_consecutive_steps() -> None:
+def test_generate_indexes_by_mode_part_returns_first_consecutive_steps() -> (
+    None
+):
     indexes = generate_indexes_by_mode(
         start_step=0,
         step_size=250000,

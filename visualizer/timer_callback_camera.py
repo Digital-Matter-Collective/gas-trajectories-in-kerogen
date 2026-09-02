@@ -1,15 +1,14 @@
-from typing import List, Optional, Any
-
+import math as m
+from typing import List, Optional
 
 import numpy as np
 import numpy.typing as npt
-import math as m
-
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
     vtkCamera,
     vtkRenderWindowInteractor,
 )
+
 
 def Rx(theta: float) -> npt.NDArray[np.float64]:
     return np.matrix(
@@ -51,16 +50,16 @@ class vtkTimerCallbackCamera:
     def __init__(
         self,
         steps: int,
-        actors: vtkActor,
+        actors: List[vtkActor],
         cameras: List[vtkCamera],
-        iren: List[vtkRenderWindowInteractor],
+        iren: vtkRenderWindowInteractor,
     ):
         self.timer_count = 0
         self.steps = steps
         self.actors = actors
         self.cameras = cameras
         self.iren = iren
-        self.timerId = None
+        self.timerId: Optional[int] = None
         self.angle = 0.0
         self.cur_pos = np.array(cameras[0].GetPosition())
 
@@ -87,4 +86,3 @@ class vtkTimerCallbackCamera:
             step += 1
         if self.timerId:
             iren.DestroyTimer(self.timerId)
-

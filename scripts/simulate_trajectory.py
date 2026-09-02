@@ -1,8 +1,8 @@
 import argparse
-import sys
-from os.path import realpath, join, isfile
-from pathlib import Path
 import pickle
+import sys
+from os.path import isfile, join, realpath
+from pathlib import Path
 
 import numpy as np
 
@@ -10,13 +10,13 @@ path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.reader import Reader
-from utils.utils import create_empirical_cdf, ps_generate
-from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from visualizer.visualizer import Visualizer, WrapMode
-from base.bufferedsampler import BufferedSampler
-from base.discretecdf import DiscreteCDF
-from base.empiricalcdf import EmpiricalCDF
+from base.bufferedsampler import BufferedSampler  # noqa: E402
+from base.discretecdf import DiscreteCDF  # noqa: E402
+from base.empiricalcdf import EmpiricalCDF  # noqa: E402
+from processes.kerogen_walk_simulator import KerogenWalkSimulator  # noqa: E402
+from utils.utils import create_empirical_cdf, ps_generate  # noqa: E402
+from visualizer.visualizer import Visualizer, WrapMode  # noqa: E402
+
 
 def run(
     path_to_main: str,
@@ -34,7 +34,6 @@ def run(
     else:
         raise RuntimeError("radiuses not found")
 
-
     path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
     if isfile(path_to_tl_wf):
         with open(path_to_tl_wf, "rb") as f:
@@ -47,7 +46,9 @@ def run(
     bs_psd = BufferedSampler(EmpiricalCDF(psd), "psd", size=100_000)
     bs_ptl = BufferedSampler(throat_lengths_weibull_fitter, "ptl", size=100_000)
 
-    simulator = KerogenWalkSimulator(bs_psd, bs_ps, bs_ptl, k, p, with_history=False)
+    simulator = KerogenWalkSimulator(
+        bs_psd, bs_ps, bs_ptl, k, p, with_history=False
+    )
     traj = simulator.run(steps)
     Visualizer.draw_trajectoryes(
         [traj],
@@ -55,7 +56,7 @@ def run(
         periodic=False,
         wrap_mode=WrapMode.EMPTY,
         with_points=True,
-        color_type='dist'
+        color_type='dist',
     )
     Visualizer.show()
 
@@ -82,4 +83,6 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    run(str(args.path), k=args.k, p=args.p, steps=args.steps, radius=args.radius)
+    run(
+        str(args.path), k=args.k, p=args.p, steps=args.steps, radius=args.radius
+    )

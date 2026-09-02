@@ -29,7 +29,9 @@ def test_all_free_trajectory_is_one_zero_event() -> None:
 def test_all_trapped_trajectory_has_no_spurious_zero_event() -> None:
     # P1-08 regression: an unconditional artificial (0.0, 1) boundary entry
     # used to make an all-trapped trajectory report k_est = 0.5 instead of 1.0.
-    seq = TrapExtractor.get_trap_seq(np.array([True, True, True]), delta_time=1.0)
+    seq = TrapExtractor.get_trap_seq(
+        np.array([True, True, True]), delta_time=1.0
+    )
     assert list(seq.times) == [3.0]
     assert list(seq.traps) == [4]
     assert seq.get_zero_trap_count() == 0
@@ -59,7 +61,9 @@ def test_alternating_runs_produce_one_entry_each() -> None:
     assert _k_est(seq.times) == pytest.approx(2 / 3)
 
 
-def test_single_trapped_edge_followed_by_free_run_is_not_misclassified() -> None:
+def test_single_trapped_edge_followed_by_free_run_is_not_misclassified() -> (
+    None
+):
     # P1-08 regression: the original state machine only advanced cur_time
     # when edge_traps[i] was True for i >= 1, so a trap run consisting only
     # of edge 0 recorded duration 0.0 and was miscounted as a free event.

@@ -1,21 +1,15 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-import os
 import pickle
-
-from itertools import repeat
-
+from dataclasses import dataclass
 from pathlib import Path
-import time
 
-from matplotlib import pyplot as plt
-from matplotlib.ticker import FixedLocator, FixedFormatter
 import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.ticker import FixedFormatter, FixedLocator
+
 from base.trajectory import Trajectory
 from utils.cache_manifest import check_cache, file_fingerprint, write_manifest
 from utils.utils import kprint
-from scipy.stats import linregress
 
 
 @dataclass
@@ -138,8 +132,12 @@ def plot_kerogen_molecula_coorfunc(input: Path, output: Path, msd_path: Path):
         write_manifest(msd_path, cache_metadata)
     else:
         if status == "mismatch":
-            kprint(f"Cache {msd_path} does not match current input; recomputing")
-        trj_msd = extract_mean_displacement(trajectories, traj_stride=traj_stride)
+            kprint(
+                f"Cache {msd_path} does not match current input; recomputing"
+            )
+        trj_msd = extract_mean_displacement(
+            trajectories, traj_stride=traj_stride
+        )
         with open(msd_path, "wb") as f:
             pickle.dump(trj_msd, f)
         write_manifest(msd_path, cache_metadata)

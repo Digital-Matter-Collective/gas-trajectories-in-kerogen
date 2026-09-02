@@ -1,32 +1,17 @@
 import sys
-import os
-from pathlib import Path
 from os.path import realpath
-import random
-import time
-from typing import IO, List, Tuple, Any
-import seaborn as sns
-import matplotlib.pyplot as plt
+from pathlib import Path
+
 import networkx as nx
 import numpy as np
-import numpy.typing as npt
-import pandas as pd
-import scipy.stats as stats
-from scipy.interpolate import UnivariateSpline
-from scipy.stats import weibull_min, exponweib
-from joblib import Parallel, delayed
-from sklearn.metrics import pairwise_distances
-from matplotlib.collections import PolyCollection
-from matplotlib import cm
-from matplotlib.ticker import LinearLocator
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.boundingbox import BoundingBox, Range
-from base.kerogendata import AtomData, KerogenData
-from visualizer.visualizer import Visualizer
+from base.boundingbox import BoundingBox, Range  # noqa: E402
+from base.kerogendata import AtomData, KerogenData  # noqa: E402
+from visualizer.visualizer import Visualizer  # noqa: E402
 
 atom_real_sizes = {
     i: s for i, s in enumerate([0.17, 0.152, 0.155, 0.109, 0.18])

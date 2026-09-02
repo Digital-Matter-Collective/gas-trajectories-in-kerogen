@@ -1,11 +1,8 @@
-from abc import abstractmethod
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Optional
 
 import numpy as np
-import numpy.typing as npt
-import time
+
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
     GammaFitter,
@@ -20,7 +17,7 @@ from processes.trajectory_analyzer.sib import (
     StructureInformedBayesParams,
 )
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-from utils.types import NPFArray, NPBArray, f32
+from utils.types import NPBArray, NPFArray, f32
 
 
 @dataclass

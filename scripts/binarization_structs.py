@@ -4,17 +4,17 @@ from pathlib import Path
 
 import numpy as np
 
+from processes.segmentaion import BinarizeAlgo
 from scripts.structure_image_utils import (
     build_segmentator,
-    extract_settings,
     collect_processing_indexes,
+    extract_settings,
     image_base_name,
     iter_structure_files,
     kprint,
     load_structure,
     write_binary_file,
 )
-from processes.segmentaion import BinarizeAlgo
 
 
 def binarize_structures(

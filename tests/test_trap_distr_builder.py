@@ -38,8 +38,8 @@ def _table_row(gas: str, mu: float) -> TableIIIRow:
 
 def test_table_iii_event_metrics_average_per_trajectory_probability() -> None:
     sequences = [
-        TrapSequence(np.ones(2), np.array([0.0, 1.0])),
-        TrapSequence(np.ones(4), np.array([0.0, 0.0, 0.0, 1.0])),
+        TrapSequence(np.ones(2, dtype=int), np.array([0.0, 1.0])),
+        TrapSequence(np.ones(4, dtype=int), np.array([0.0, 0.0, 0.0, 1.0])),
     ]
 
     summary = summarize_trap_events(sequences)

@@ -10,9 +10,9 @@ from utils.timer import Timer, TimerError
 
 
 def _make_trajectory(n: int = 5) -> Trajectory:
-    points = np.cumsum(
-        np.ones((n, 3), dtype=np.float32) * 0.1, axis=0
-    ).astype(np.float32)
+    points = np.cumsum(np.ones((n, 3), dtype=np.float32) * 0.1, axis=0).astype(
+        np.float32
+    )
     times = np.arange(n, dtype=np.float32)
     box = BoundingBox(Range(0, 100), Range(0, 100), Range(0, 100))
     return Trajectory(points=points, times=times, box=box)
@@ -120,8 +120,8 @@ def _make_frame(step: int, t: float, count: int = 1) -> bytes:
 
 
 def test_read_head_struct_default_info_does_not_leak_across_calls() -> None:
-    frame_a = io.StringIO(f"Kerogen t= 10.00000 step= 100\n1\n")
-    frame_b = io.StringIO(f"Kerogen t= 20.00000 step= 200\n1\n")
+    frame_a = io.StringIO("Kerogen t= 10.00000 step= 100\n1\n")
+    frame_b = io.StringIO("Kerogen t= 20.00000 step= 200\n1\n")
 
     num_a, time_a = Reader.read_head_struct(frame_a)
     num_b, time_b = Reader.read_head_struct(frame_b)

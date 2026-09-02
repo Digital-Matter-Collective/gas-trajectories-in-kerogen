@@ -5,6 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from processes.trajectory_analyzer.dm import DistanceMatrixParams
 from scripts.dm_parameter_search import (
     CANDIDATE_GRID,
     CANDIDATE_SHAPE,
@@ -25,7 +26,6 @@ from scripts.find_best_params import (
     save_table_i_summary,
     select_optimal_parameters,
 )
-from processes.trajectory_analyzer.dm import DistanceMatrixParams
 
 
 def _loaded(errors: np.ndarray) -> LoadedPairErrors:
@@ -43,9 +43,16 @@ def test_shared_grid_contains_only_the_twelve_article_scale_sets() -> None:
     assert DEFAULT_TRAJECTORY_COUNT == 100
     assert CANDIDATE_SHAPE == (12, 216)
     assert tuple(row[0].scale_set for row in CANDIDATE_GRID) == SCALE_SETS
-    assert len(
-        {candidate.candidate_id for row in CANDIDATE_GRID for candidate in row}
-    ) == 12 * 216
+    assert (
+        len(
+            {
+                candidate.candidate_id
+                for row in CANDIDATE_GRID
+                for candidate in row
+            }
+        )
+        == 12 * 216
+    )
 
     for scale_set, candidates in zip(SCALE_SETS, CANDIDATE_GRID):
         original = DistanceMatrixParams.get_params(lmu=scale_set)
@@ -224,9 +231,7 @@ def test_resume_replaces_legacy_results_without_deleting_them_first(
         seed=42,
     )
 
-    assert (
-        _load_cached_result(result_path, metadata, allow_legacy=True) is None
-    )
+    assert _load_cached_result(result_path, metadata, allow_legacy=True) is None
     assert result_path.is_file()
     with pytest.raises(RuntimeError, match="Legacy result"):
         _load_cached_result(result_path, metadata, allow_legacy=False)

@@ -206,11 +206,20 @@ def resolve_step_time_mapping(
             f"{', '.join(missing)} and trajectory source is {source}"
         )
 
+    resolved_anchor_step = values["anchor_step"]
+    resolved_anchor_time_ps = values["anchor_time_ps"]
+    resolved_step_delta = values["step_delta"]
+    resolved_time_delta_ps = values["time_delta_ps"]
+    assert resolved_anchor_step is not None
+    assert resolved_anchor_time_ps is not None
+    assert resolved_step_delta is not None
+    assert resolved_time_delta_ps is not None
+
     return StepTimeMapping(
-        anchor_step=int(values["anchor_step"]),
-        anchor_time_ps=float(values["anchor_time_ps"]),
-        step_delta=int(values["step_delta"]),
-        time_delta_ps=float(values["time_delta_ps"]),
+        anchor_step=int(resolved_anchor_step),
+        anchor_time_ps=float(resolved_anchor_time_ps),
+        step_delta=int(resolved_step_delta),
+        time_delta_ps=float(resolved_time_delta_ps),
     )
 
 
@@ -427,9 +436,9 @@ def build_segmentator(
     bbox,
     img_size,
 ):
-    from processes.segmentaion import Segmentator
     from base.kerogendata import KerogenData
     from base.periodizer import Periodizer
+    from processes.segmentaion import Segmentator
 
     _, _, atoms, _ = structure
     kerogen_data = KerogenData(None, atoms, bbox)

@@ -2,8 +2,6 @@ import argparse
 from pathlib import Path
 from typing import Tuple
 
-import matplotlib
-
 # matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
@@ -246,9 +244,13 @@ def run(
     )
 
     if output is None:
-        output = trajectory_path.parent / "figs" / (
-            f"dm_invariant_trj={trajectory_index}_"
-            f"range={actual_min_index}-{actual_max_index}.svg"
+        output = (
+            trajectory_path.parent
+            / "figs"
+            / (
+                f"dm_invariant_trj={trajectory_index}_"
+                f"range={actual_min_index}-{actual_max_index}.svg"
+            )
         )
 
     plot_invariant(

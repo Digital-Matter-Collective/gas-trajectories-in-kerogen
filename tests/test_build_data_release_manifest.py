@@ -1,8 +1,6 @@
 import json
 from pathlib import Path
 
-import pytest
-
 from scripts.build_data_release_manifest import (
     build_manifest,
     save_manifest,
@@ -18,7 +16,9 @@ def _make_data_dir(tmp_path: Path) -> Path:
     return data_dir
 
 
-def test_build_manifest_hashes_every_file_and_skips_itself(tmp_path: Path) -> None:
+def test_build_manifest_hashes_every_file_and_skips_itself(
+    tmp_path: Path,
+) -> None:
     data_dir = _make_data_dir(tmp_path)
 
     manifest = build_manifest(
@@ -54,7 +54,10 @@ def test_verify_manifest_detects_missing_corrupted_and_unexpected_files(
 ) -> None:
     data_dir = _make_data_dir(tmp_path)
     manifest = build_manifest(
-        data_dir, license_name="CC-BY-4.0", code_url=None, code_version=None,
+        data_dir,
+        license_name="CC-BY-4.0",
+        code_url=None,
+        code_version=None,
         description=None,
     )
     manifest_path = save_manifest(manifest, data_dir)

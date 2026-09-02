@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
+
 import numpy as np
 
 from base.trajectory import Trajectory
@@ -7,17 +8,16 @@ from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
-from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-
-from utils.types import NPBArray, i32
+from processes.trajectory_analyzer.bayes import (
+    BayesAnalyzer,
+    BayesParams,
+)
 from processes.trajectory_analyzer.np import (
     NeymanPearsonAnalyzer,
     NeymanPearsonParams,
 )
-from processes.trajectory_analyzer.bayes import (
-    BayesParams,
-    BayesAnalyzer,
-)
+from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
+from utils.types import NPBArray, i32
 
 
 @dataclass

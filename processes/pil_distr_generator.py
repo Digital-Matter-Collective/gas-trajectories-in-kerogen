@@ -1,11 +1,11 @@
-from typing import Iterable
+from typing import Iterable, cast
+
+import numpy as np
+from joblib import Parallel, delayed
+from scipy.spatial.distance import pdist
+from scipy.stats import exponweib
 
 from utils.types import NPFArray, f32
-from scipy.spatial.distance import pdist
-import numpy as np
-import numpy.typing as npt
-from joblib import Parallel, delayed
-from scipy.stats import exponweib
 
 
 class PiLDistrGenerator:
@@ -51,7 +51,7 @@ class PiLDistrGenerator:
             eq = i == j
 
         d = xyz[i] - xyz[j]
-        return np.sqrt(np.sum(d * d, axis=1))
+        return cast(NPFArray, np.sqrt(np.sum(d * d, axis=1)))
 
     @staticmethod
     def _make_xyz_in_unit_ball(
@@ -60,12 +60,10 @@ class PiLDistrGenerator:
         xyz = rng.uniform(-1.0, 1.0, size=(count_points, 3)).astype(np.float32)
         # быстрее, чем sqrt
         xyz = xyz[np.sum(xyz * xyz, axis=1) < 1.0]
-        return xyz
+        return cast(NPFArray, xyz)
 
     @staticmethod
-    def _iter_batches(
-        arr: npt.NDArray[np.float64], batch_size: int
-    ) -> Iterable[npt.NDArray[np.float64]]:
+    def _iter_batches(arr: NPFArray, batch_size: int) -> Iterable[NPFArray]:
         for start in range(0, arr.size, batch_size):
             yield arr[start : start + batch_size]
 
@@ -150,7 +148,7 @@ class PiLDistrGenerator:
         d_unit.sort()  # сортируем один раз
 
         self._d_unit_sorted = d_unit
-        return d_unit
+        return cast(np.ndarray, d_unit)
 
     def get_conditional_curves(self, pore_radiuses: np.ndarray, step: int = 10):
         pore_radiuses = np.asarray(pore_radiuses, dtype=f32)

@@ -1,17 +1,18 @@
-import sys
-import os
-from pathlib import Path
-from os.path import realpath
-import numpy as np
 import argparse
+import os
+import sys
+from os.path import realpath
+from pathlib import Path
+
+import numpy as np
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.boundingbox import BoundingBox, Range
-from utils.utils import get_float_img_pattern, kprint
-from visualizer.visualizer import Visualizer
+from base.boundingbox import BoundingBox, Range  # noqa: E402
+from utils.utils import get_float_img_pattern, kprint  # noqa: E402
+from visualizer.visualizer import Visualizer  # noqa: E402
 
 
 def extanded_struct_extr(
@@ -48,7 +49,9 @@ def extanded_struct_extr(
     )
 
     img = np.pad(img, [(1, 1), (1, 1), (1, 1)], 'maximum')
-    Visualizer.draw_float_img(img, bbox, isovalue=isovalue, img_opacity=img_opacity)
+    Visualizer.draw_float_img(
+        img, bbox, isovalue=isovalue, img_opacity=img_opacity
+    )
     Visualizer.show()
 
 

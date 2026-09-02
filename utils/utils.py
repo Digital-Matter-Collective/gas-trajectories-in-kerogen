@@ -1,14 +1,16 @@
+import builtins
+import re
+import sys
+from typing import Any, List, TextIO
+
 import numpy as np
 import numpy.typing as npt
 from scipy import stats
-from typing import List, Any, TextIO
-from base.kerogendata import AtomData
-import builtins
-import sys
 from scipy.stats import poisson
+
 from base.boundingbox import BoundingBox
-from utils.types import NPFArray, NPIArray, NPBArray
-import re
+from base.kerogendata import AtomData
+from utils.types import NPFArray
 
 
 def get_pattern_bbox():
@@ -133,7 +135,7 @@ def create_box_mask(atoms: List[AtomData], box: BoundingBox):
     removed_atoms = set()
     rm_mask = np.array(range(len(atoms)), dtype=np.bool_)
     for i, a in enumerate(atoms):
-        rm_mask[i] = box.inside(a.pos)
+        rm_mask[i] = box.inside_pos(a.pos)
         if ~rm_mask[i]:
             removed_atoms.add(i)
     return removed_atoms, rm_mask

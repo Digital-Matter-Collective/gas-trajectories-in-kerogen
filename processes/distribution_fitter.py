@@ -1,13 +1,23 @@
 from enum import Enum
-from typing import Optional
+from typing import Optional, Protocol, cast
+
 import numpy as np
-from utils.types import NPFArray, f32
 from scipy.stats import exponweib, gamma
+
+from utils.types import NPFArray, f32
 
 
 class DistributionType(Enum):
     EXPWEIB = 1
     GAMMA = 2
+
+
+class PdfFitter(Protocol):
+    """Structural type for step-density fitters used by the trajectory
+    analyzers: anything with a matching `pdf(x)` works, real fitters and
+    test doubles alike."""
+
+    def pdf(self, x: NPFArray) -> NPFArray: ...
 
 
 class WeibullFitter:
@@ -19,23 +29,31 @@ class WeibullFitter:
     def fit(self, data: NPFArray):
         assert self.params is None
         # exponweib.fit возвращает (a, c, loc, scale)
-        self.params = tuple(float(v) for v in exponweib.fit(data))
+        fitted = [float(v) for v in exponweib.fit(data)]
+        self.params = (fitted[0], fitted[1], fitted[2], fitted[3])
 
     def rvs(self, size: int) -> NPFArray:
         assert self.params is not None
         a, c, loc, scale = self.params
         # это использует scipy/numpy RNG внутри, векторно
-        return exponweib.rvs(a, c, loc=loc, scale=scale, size=size).astype(f32)
+        return cast(
+            NPFArray,
+            exponweib.rvs(a, c, loc=loc, scale=scale, size=size).astype(f32),
+        )
 
     def pdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
         a, c, loc, scale = self.params
-        return exponweib.pdf(x, a, c, loc=loc, scale=scale).astype(f32)
+        return cast(
+            NPFArray, exponweib.pdf(x, a, c, loc=loc, scale=scale).astype(f32)
+        )
 
     def cdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
         a, c, loc, scale = self.params
-        return exponweib.cdf(x, a, c, loc=loc, scale=scale).astype(f32)
+        return cast(
+            NPFArray, exponweib.cdf(x, a, c, loc=loc, scale=scale).astype(f32)
+        )
 
 
 class GammaFitter:
@@ -62,22 +80,22 @@ class GammaFitter:
         # plt.plot(x, gamma.pdf(x,fdata.params[0],loc=fdata.params[1], scale=fdata.params[2]))
 
     @staticmethod
-    def interp(val: float, x: float, csum: NPFArray) -> float:
+    def interp(val: float, x: NPFArray, csum: NPFArray) -> float:
         if val > csum[-1]:
-            return x[-1]
+            return float(x[-1])
         if val < csum[0]:
-            return x[0]
+            return float(x[0])
         mask = np.where(val > csum)[0]
         i1 = mask[-1]
         i2 = i1 + 1
-        return x[i1] + (x[i2] - x[i1]) * (val - csum[i1]) / (
-            csum[i2] - csum[i1]
+        return float(
+            x[i1] + (x[i2] - x[i1]) * (val - csum[i1]) / (csum[i2] - csum[i1])
         )
 
     def pdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
-        return gamma.pdf(x, *self.params)
+        return cast(NPFArray, gamma.pdf(x, *self.params))
 
     def cdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
-        return gamma.cdf(x, *self.params)
+        return cast(NPFArray, gamma.cdf(x, *self.params))

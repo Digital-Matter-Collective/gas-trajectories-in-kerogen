@@ -1,5 +1,6 @@
-from base.trap_sequence import TrapSequence
 import numpy as np
+
+from base.trap_sequence import TrapSequence
 from utils.types import NPBArray
 
 # Bump when get_trap_seq's run-encoding changes, so callers that cache its

@@ -62,7 +62,9 @@ def build_manifest(
 
     return {
         "schema_version": MANIFEST_SCHEMA_VERSION,
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(timezone.utc).isoformat(
+            timespec="seconds"
+        ),
         "description": description,
         "license": license_name,
         "code_repository": code_url,
@@ -74,7 +76,9 @@ def build_manifest(
 
 
 def save_manifest(
-    manifest: dict[str, Any], data_dir: Path, manifest_name: str = "data_manifest.json"
+    manifest: dict[str, Any],
+    data_dir: Path,
+    manifest_name: str = "data_manifest.json",
 ) -> Path:
     target = data_dir / manifest_name
     temporary = target.with_name(f".{target.name}.tmp")
@@ -119,7 +123,9 @@ def _build_command(args: argparse.Namespace) -> None:
         description=args.description,
         manifest_name=args.manifest_name,
     )
-    path = save_manifest(manifest, args.data_dir, manifest_name=args.manifest_name)
+    path = save_manifest(
+        manifest, args.data_dir, manifest_name=args.manifest_name
+    )
     print(
         f"Wrote {path} ({manifest['file_count']} files, "
         f"{manifest['total_bytes']} bytes)"
@@ -128,7 +134,9 @@ def _build_command(args: argparse.Namespace) -> None:
 
 def _verify_command(args: argparse.Namespace) -> None:
     manifest_path = args.manifest or (args.data_dir / "data_manifest.json")
-    missing, corrupted, unexpected = verify_manifest(args.data_dir, manifest_path)
+    missing, corrupted, unexpected = verify_manifest(
+        args.data_dir, manifest_path
+    )
     if not missing and not corrupted and not unexpected:
         print(f"OK: {args.data_dir} matches {manifest_path}")
         return
@@ -157,7 +165,8 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build_parser = subparsers.add_parser(
-        "build", help="Hash every file under data_dir and write data_manifest.json"
+        "build",
+        help="Hash every file under data_dir and write data_manifest.json",
     )
     build_parser.add_argument("data_dir", type=Path)
     build_parser.add_argument(

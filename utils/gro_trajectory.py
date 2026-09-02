@@ -79,9 +79,10 @@ def filter_trajectory(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with input_path.open("r", encoding="utf-8") as fin, output_path.open(
-        "w", encoding="utf-8"
-    ) as fout:
+    with (
+        input_path.open("r", encoding="utf-8") as fin,
+        output_path.open("w", encoding="utf-8") as fout,
+    ):
         while True:
             header = fin.readline()
 

@@ -1,5 +1,6 @@
-from utils.types import NPFArray, f32
 import numpy as np
+
+from utils.types import NPFArray, f32
 
 
 class DiscreteCDF:

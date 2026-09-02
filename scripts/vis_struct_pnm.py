@@ -1,16 +1,9 @@
-import sys
-import os
-from pathlib import Path
-from os import listdir
-from os.path import realpath, join, isfile
-import time
-from typing import List, Tuple
-import numpy as np
 import argparse
+from pathlib import Path
+
 import networkx as nx
-import json
+import numpy as np
 from scipy import ndimage
-import subprocess
 
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
@@ -39,7 +32,7 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
         [(i, {"color_id": 0, "scale_id": i}) for i, _ in enumerate(r)]
     )
     graph.add_weighted_edges_from(
-        [(l[0], l[1], tl[i, 0]) for i, l in enumerate(ll)]
+        [(link[0], link[1], tl[i, 0]) for i, link in enumerate(ll)]
     )
 
     float_img = np.load(path_to_img)
@@ -68,9 +61,15 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
 
 
 if "__main__" == __name__:
-    parser = argparse.ArgumentParser(description="Visualize PNM and structure image")
+    parser = argparse.ArgumentParser(
+        description="Visualize PNM and structure image"
+    )
     parser.add_argument("img", type=Path, help="Float image .npy file")
-    parser.add_argument("pnm_prefix", type=Path, help="PNM files prefix (without _node1.dat etc.)")
+    parser.add_argument(
+        "pnm_prefix",
+        type=Path,
+        help="PNM files prefix (without _node1.dat etc.)",
+    )
     args = parser.parse_args()
 
     read_and_draw_pnm_and_img(

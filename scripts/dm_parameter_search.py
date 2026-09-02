@@ -8,8 +8,9 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Sequence
 
-from processes.trajectory_analyzer.dm import DistanceMatrixParams
+import numpy as np
 
+from processes.trajectory_analyzer.dm import DistanceMatrixParams
 
 SEARCH_SCHEMA_VERSION = 1
 K_VALUES = (0.1, 0.5, 0.9)
@@ -54,7 +55,7 @@ class DMCandidate:
             nu=self.invariant_threshold,
             diag_percentile=self.diagonal_percentile,
             kernel_size=self.kernel_radius,
-            list_mu=self.scale_set,
+            list_mu=np.array(self.scale_set),
             p_value=self.p_value_threshold,
         )
 
@@ -184,12 +185,12 @@ def expected_result_metadata(
     }
 
 
-def validate_error_matrix_shape(matrix: Sequence[Sequence[float]]) -> None:
+def validate_error_matrix_shape(
+    matrix: Sequence[Sequence[float]] | np.ndarray,
+) -> None:
     row_count = len(matrix)
     column_counts = {len(row) for row in matrix}
-    if row_count != CANDIDATE_SHAPE[0] or column_counts != {
-        CANDIDATE_SHAPE[1]
-    }:
+    if row_count != CANDIDATE_SHAPE[0] or column_counts != {CANDIDATE_SHAPE[1]}:
         raise ValueError(
             f"Expected error matrix shape {CANDIDATE_SHAPE}, got "
             f"{row_count} rows with column counts {sorted(column_counts)}"

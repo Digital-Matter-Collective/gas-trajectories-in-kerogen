@@ -25,18 +25,14 @@ class Timer:
     def start(self) -> None:
         """Начать новый таймер"""
         if self._start_time is not None:
-            raise TimerError(
-                "Timer is already running. Use .stop() to stop it"
-            )
+            raise TimerError("Timer is already running. Use .stop() to stop it")
 
         self._start_time = time.perf_counter()
 
     def stop(self, mark: str = "") -> float:
         """Остановить таймер и сообщить истекшее время"""
         if self._start_time is None:
-            raise TimerError(
-                "Timer is not running. Use .start() to start its"
-            )
+            raise TimerError("Timer is not running. Use .start() to start its")
 
         # Рассчитать прошедшее время
         elapsed_time = time.perf_counter() - self._start_time

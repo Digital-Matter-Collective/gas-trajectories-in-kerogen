@@ -1,7 +1,10 @@
+from typing import cast
+
 import numpy as np
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
+from processes.distribution_fitter import GammaFitter, WeibullFitter
 from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
     DistanceMatrixParams,
@@ -50,8 +53,8 @@ def test_hybrid_recomputes_dm_mask_for_each_trajectory(monkeypatch) -> None:
             StructureInformedBayesParams(),
             DistanceMatrixParams(),
         ),
-        pi_l_gf=None,
-        throat_lengthes_wf=None,
+        pi_l_gf=cast(GammaFitter, None),
+        throat_lengthes_wf=cast(WeibullFitter, None),
     )
 
     first = analyzer.run(_trajectory(10))
@@ -89,8 +92,8 @@ def test_hybrid_dm_override_is_used_once(monkeypatch) -> None:
             StructureInformedBayesParams(),
             DistanceMatrixParams(),
         ),
-        pi_l_gf=None,
-        throat_lengthes_wf=None,
+        pi_l_gf=cast(GammaFitter, None),
+        throat_lengthes_wf=cast(WeibullFitter, None),
     )
     analyzer.set_trap_approx(np.ones(9, dtype=np.bool_))
 

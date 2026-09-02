@@ -8,6 +8,7 @@ from typing import Mapping
 
 import numpy as np
 
+from processes.trajectory_analyzer.dm import list_vert_median
 from scripts.dm_parameter_search import (
     CANDIDATE_GRID,
     CANDIDATE_SHAPE,
@@ -19,7 +20,6 @@ from scripts.dm_parameter_search import (
     result_file_name,
     validate_error_matrix_shape,
 )
-from processes.trajectory_analyzer.dm import list_vert_median
 from utils.utils import kprint
 
 
@@ -74,14 +74,18 @@ def _load_legacy_errors(
             0 <= scale_index < CANDIDATE_SHAPE[0]
             and 0 <= parameter_index < CANDIDATE_SHAPE[1]
         ):
-            raise ValueError(f"Candidate index outside the shared grid: {key!r}")
+            raise ValueError(
+                f"Candidate index outside the shared grid: {key!r}"
+            )
         if np.isfinite(errors[scale_index, parameter_index]):
             raise ValueError(f"Duplicate legacy candidate key: {key!r}")
         errors[scale_index, parameter_index] = float(value)
 
     if not np.all(np.isfinite(errors)):
         missing = int(np.count_nonzero(~np.isfinite(errors)))
-        raise ValueError(f"Legacy result {path} is missing {missing} candidates")
+        raise ValueError(
+            f"Legacy result {path} is missing {missing} candidates"
+        )
     return LoadedPairErrors(
         errors=errors,
         source_format="legacy_pickle_without_metadata",
@@ -146,13 +150,17 @@ def load_pair_errors(
     )
 
 
-def load_all_pair_errors(path: Path) -> dict[tuple[float, float], LoadedPairErrors]:
+def load_all_pair_errors(
+    path: Path,
+) -> dict[tuple[float, float], LoadedPairErrors]:
     loaded = {}
     for k_index, k in enumerate(K_VALUES):
         for p_index, p in enumerate(P_VALUES):
             result_path = path / result_file_name(k, p)
             if not result_path.is_file():
-                raise FileNotFoundError(f"Missing parameter-search result: {result_path}")
+                raise FileNotFoundError(
+                    f"Missing parameter-search result: {result_path}"
+                )
             loaded[(k, p)] = load_pair_errors(
                 result_path,
                 k=k,
@@ -238,7 +246,9 @@ def select_optimal_parameters(
                 f"got {stacked.shape[1:]}"
             )
         if not np.all(np.isfinite(stacked)):
-            raise ValueError(f"Cannot select k={k}: some candidates are uncomputed")
+            raise ValueError(
+                f"Cannot select k={k}: some candidates are uncomputed"
+            )
 
         aggregate = np.mean(stacked, axis=0)
         scale_index, parameter_index = np.unravel_index(
@@ -249,7 +259,9 @@ def select_optimal_parameters(
             _candidate_to_table_row(
                 k=k,
                 candidate=candidate,
-                aggregate_mean_error=float(aggregate[scale_index, parameter_index]),
+                aggregate_mean_error=float(
+                    aggregate[scale_index, parameter_index]
+                ),
                 pair_results=pair_results,
             )
         )

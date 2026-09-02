@@ -1,18 +1,9 @@
 import argparse
-import os
-import sys
-import time
-from os.path import join, realpath
+from os.path import join
 from pathlib import Path
-from typing import List, Tuple
-import pickle
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from scipy import ndimage
-import seaborn as sns
-from skimage import measure
 
+import numpy as np
+from scipy import ndimage
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
@@ -127,14 +118,24 @@ def visualize_dist_trajectory(
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Visualize distance trajectory with structure image")
+    parser = argparse.ArgumentParser(
+        description="Visualize distance trajectory with structure image"
+    )
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument("img", type=Path, help="Float image .npy file")
     parser.add_argument("--num", type=int, default=2, help="Molecule index")
-    parser.add_argument("--start-index", type=int, default=0, help="Start crop index")
-    parser.add_argument("--end-index", type=int, default=-1, help="End crop index")
+    parser.add_argument(
+        "--start-index", type=int, default=0, help="Start crop index"
+    )
+    parser.add_argument(
+        "--end-index", type=int, default=-1, help="End crop index"
+    )
 
     args = parser.parse_args()
     visualize_dist_trajectory(
-        str(args.path), str(args.img), args.start_index, args.end_index, args.num
+        str(args.path),
+        str(args.img),
+        args.start_index,
+        args.end_index,
+        args.num,
     )

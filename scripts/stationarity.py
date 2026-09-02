@@ -29,25 +29,26 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-from os import listdir
-from os.path import dirname, isfile, join, realpath
-
 from dataclasses import dataclass
+from os import listdir
+from os.path import isfile, join
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Sequence, Tuple, Union
-from scipy.stats import kstwobign
-import numpy as np
+from typing import Dict, List, Optional, Sequence, Tuple, Union
+
 import matplotlib
+import numpy as np
+from scipy.stats import kstwobign
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from scipy.stats import ks_2samp, gaussian_kde
+from matplotlib.ticker import FuncFormatter, MultipleLocator
+from scipy.stats import gaussian_kde, ks_2samp
+
 from base.reader import Reader
 from scripts.structure_image_utils import (
     StepTimeMapping,
     resolve_step_time_mapping,
 )
-from matplotlib.ticker import MultipleLocator, FuncFormatter
-
 
 Array1D = np.ndarray
 Samples = Union[Dict[float, Array1D], Dict[int, Array1D], Sequence[Array1D]]
@@ -77,7 +78,9 @@ def _select_indices(
 
 def _make_color_map(idx: Sequence[int]):
     # стабильные цвета (tab10/tab20) — один и тот же idx -> один и тот же цвет
-    cmap = matplotlib.colormaps["tab10" if len(idx) <= 10 else "tab20"].resampled(len(idx))
+    cmap = matplotlib.colormaps[
+        "tab10" if len(idx) <= 10 else "tab20"
+    ].resampled(len(idx))
     return {k: cmap(pos) for pos, k in enumerate(idx)}
 
 
@@ -313,12 +316,12 @@ def ks_pairs(
     p = np.zeros(len(pairs), dtype=float)
 
     for k, (i, j) in enumerate(pairs):
-        a, b = arrays[i], arrays[j]
-        if a.size < 2 or b.size < 2:
+        arr_i, arr_j = arrays[i], arrays[j]
+        if arr_i.size < 2 or arr_j.size < 2:
             D[k] = np.nan
             p[k] = np.nan
             continue
-        res = ks_2samp(a, b, alternative=alternative, method=method)
+        res = ks_2samp(arr_i, arr_j, alternative=alternative, method=method)
         D[k] = float(res.statistic)
         p[k] = float(res.pvalue)
 
@@ -462,8 +465,8 @@ def plot_hist_overlay(
     # choose curves: evenly spaced in time
     n = len(arrays)
     if idx is None:
-        idx = np.linspace(0, n - 1, min(max_curves, n)).round().astype(int)
-        idx = np.unique(idx).tolist()
+        idx_grid = np.linspace(0, n - 1, min(max_curves, n)).round().astype(int)
+        idx = np.unique(idx_grid).tolist()
     else:
         idx = list(idx)
 
@@ -623,16 +626,15 @@ def plot_ks_vs_time(
     title: str,
     use_adjusted_p: bool = True,
 ):
-    p = res.p_adj if (use_adjusted_p and res.p_adj is not None) else res.p
     pairs = res.pairs
     times = res.times
 
     # A comparison belongs to the interval between its two observations, so it
     # is intentionally placed at the temporal midpoint of the pair.
-    xs = []
+    xs_list = []
     for i, j in pairs:
-        xs.append(0.5 * (times[i] + times[j]))
-    xs = np.asarray(xs)
+        xs_list.append(0.5 * (times[i] + times[j]))
+    xs = np.asarray(xs_list)
 
     fig = plt.figure()
     ax1 = fig.add_subplot(111)
@@ -854,11 +856,7 @@ def analysis(
     onlyfiles = [
         f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))
     ]
-    onlyfiles = [
-        file
-        for file in onlyfiles
-        if "_link1" in file
-    ]
+    onlyfiles = [file for file in onlyfiles if "_link1" in file]
     steps = [int((file.split("=")[1]).split("_")[0]) for file in onlyfiles]
     sorted_lfiles = list(zip(steps, onlyfiles))
     sorted_lfiles = sorted(sorted_lfiles, key=lambda x: x[0])
@@ -946,7 +944,9 @@ def analysis(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="KS-based stationarity analysis")
+    parser = argparse.ArgumentParser(
+        description="KS-based stationarity analysis"
+    )
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument(
         "--trajectory",

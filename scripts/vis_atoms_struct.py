@@ -1,22 +1,17 @@
-import pickle
-import sys
-import os
-from pathlib import Path
-from os import listdir
-from os.path import realpath, join, isfile
-import time
-import re
-from typing import List, Tuple
-import numpy as np
 import argparse
+import os
+import pickle
+from os.path import isfile, join
+from pathlib import Path
+from typing import Any, List
+
 import networkx as nx
-import json
+import numpy as np
 from scipy import ndimage
-import subprocess
-from utils.utils import kprint, get_pattern_bbox
 
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
+from utils.utils import get_pattern_bbox
 from visualizer.visualizer import Visualizer
 
 atom_real_sizes = {
@@ -80,7 +75,7 @@ def read_and_draw_atoms_struct(
 
     # 1. Фильтруем атомы, но сохраняем старые индексы
     old_to_new = {}
-    filtered_atoms = []
+    filtered_atoms: List[Any] = []
 
     for old_idx, atom in enumerate(atoms):
         if bbox.inside(*atom.pos):
@@ -94,10 +89,9 @@ def read_and_draw_atoms_struct(
         if i in old_to_new and j in old_to_new:
             new_links.append([old_to_new[i], old_to_new[j]])
 
-    atoms = filtered_atoms
-    linked_list = np.asarray(new_links, dtype=np.int64)
+    linked_list_arr = np.asarray(new_links, dtype=np.int64)
 
-    node_pos = {idx: atom.pos for idx, atom in enumerate(atoms)}
+    node_pos = {idx: atom.pos for idx, atom in enumerate(filtered_atoms)}
 
     min_connection_size = np.array(list(atom_real_sizes.values())).min() / 2
 
@@ -105,11 +99,11 @@ def read_and_draw_atoms_struct(
     graph.add_nodes_from(
         [
             (i, {"color_id": atom.type_id, "scale_id": atom.type_id})
-            for i, atom in enumerate(atoms)
+            for i, atom in enumerate(filtered_atoms)
         ]
     )
     graph.add_weighted_edges_from(
-        [(l[0], l[1], min_connection_size) for i, l in enumerate(linked_list)]
+        [(link[0], link[1], min_connection_size) for link in linked_list_arr]
     )
 
     float_img = np.load(path_to_img)
@@ -135,11 +129,17 @@ def read_and_draw_atoms_struct(
 
 
 if "__main__" == __name__:
-    parser = argparse.ArgumentParser(description="Visualize atom structure with image overlay")
+    parser = argparse.ArgumentParser(
+        description="Visualize atom structure with image overlay"
+    )
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument("img", type=Path, help="Float image .npy file")
-    parser.add_argument("--index", type=int, required=True, help="Frame index (num=)")
-    parser.add_argument("--time-ps", type=int, required=True, help="Frame time in ps")
+    parser.add_argument(
+        "--index", type=int, required=True, help="Frame index (num=)"
+    )
+    parser.add_argument(
+        "--time-ps", type=int, required=True, help="Frame time in ps"
+    )
     args = parser.parse_args()
 
     read_and_draw_atoms_struct(

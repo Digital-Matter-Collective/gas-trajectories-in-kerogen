@@ -3,34 +3,28 @@ import json
 import pickle
 import sys
 from os import listdir
-from os.path import dirname, isfile, join, realpath, exists
+from os.path import isfile, join, realpath
 from pathlib import Path
-
-from typing import Any, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
-from joblib import Parallel, delayed
-from matplotlib import cm
-from scipy.stats import exponweib
-from sklearn.metrics import pairwise_distances
 from scipy.signal import savgol_filter
-from utils.types import NPFArray
+
 from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
 from utils.cache_manifest import check_cache, path_fingerprint, write_manifest
-from utils.utils import kprint
 from utils.timer import Timer
+from utils.utils import kprint
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.reader import Reader
-from processes.pil_distr_generator import PiLDistrGenerator
+from base.reader import Reader  # noqa: E402
+from processes.pil_distr_generator import PiLDistrGenerator  # noqa: E402
 
 
 def plot_ar(ar, maxes, title, xlabel):
@@ -85,7 +79,8 @@ def get_radiuses_lengthes(path_to_pnms: str):
     onlyfiles = [
         join(path_to_pnms, file[:-10]) for file in onlyfiles if "_link1" in file
     ]
-    radiuses, throat_lengths = [], []
+    radiuses: npt.NDArray = np.array([])
+    throat_lengths: npt.NDArray = np.array([])
     for f in onlyfiles:
         r, t = Reader.read_pnm_data(f, border=0.003)
         radiuses = np.concatenate((radiuses, r))

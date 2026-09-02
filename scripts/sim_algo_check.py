@@ -5,18 +5,17 @@ import os
 import pickle
 import random
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, List, cast
 
 import matplotlib.pyplot as plt
 import numpy as np
+import numpy.typing as npt
 
 from base.bufferedsampler import BufferedSampler
 from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
 from base.trap_sequence import TrapSequence
-from scripts.dm_parameter_search import K_VALUES, table_i_candidate_for_k
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
 from processes.trajectory_analyzer.dm import DistanceMatrixAnalyzer
 from processes.trajectory_analyzer.hybrid import HybridAnalyzer, HybridParams
 from processes.trajectory_analyzer.np import (
@@ -27,8 +26,9 @@ from processes.trajectory_analyzer.sib import (
     StructureInformedBayesAnalyzer,
     StructureInformedBayesParams,
 )
+from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
+from scripts.dm_parameter_search import K_VALUES, table_i_candidate_for_k
 from utils.utils import create_empirical_cdf, kprint, ps_generate
-
 
 DEFAULT_TRAJECTORY_COUNT = 100
 DEFAULT_STEP_COUNT = 3000
@@ -81,7 +81,7 @@ def _shared_error_axis_limits(
     q_high: float,
     center: str,
 ) -> tuple[float, float]:
-    extrema = []
+    extrema: List[npt.NDArray] = []
     for errors, _ in data.values():
         low, central, high = _error_band(
             errors,
@@ -206,7 +206,9 @@ def estimate_trapping_probability(sequence: TrapSequence) -> float:
     n_trapped = int(sequence.get_non_zero_trap_count())
     event_count = n_zero + n_trapped
     if event_count == 0:
-        raise ValueError("Cannot estimate k from a sequence without trap events")
+        raise ValueError(
+            "Cannot estimate k from a sequence without trap events"
+        )
     return n_trapped / event_count
 
 
@@ -227,9 +229,7 @@ def _build_simulator(
         EmpiricalCDF(pore_size_distribution), "psd", size=10_000
     )
     throat_lengths = BufferedSampler(throat_fitter, "ptl", size=10_000)
-    step_counts = BufferedSampler(
-        step_count_distribution, "ps", size=10_000
-    )
+    step_counts = BufferedSampler(step_count_distribution, "ps", size=10_000)
     return KerogenWalkSimulator(
         pore_sizes,
         step_counts,
@@ -312,13 +312,15 @@ def trajectories_simulation(
                 )
             cached_trajectories = list(payload.get("trajectories", []))
             if len(cached_trajectories) > trajectory_count:
-                raise RuntimeError(f"Too many trajectories in cache: {cache_path}")
+                raise RuntimeError(
+                    f"Too many trajectories in cache: {cache_path}"
+                )
         else:
             _atomic_pickle_dump(
                 {"metadata": metadata, "trajectories": []}, cache_path
             )
 
-        seeds = metadata["trajectory_seeds"]
+        seeds = cast(List[int], metadata["trajectory_seeds"])
         for trajectory_index in range(
             len(cached_trajectories), trajectory_count
         ):
@@ -340,9 +342,7 @@ def trajectories_simulation(
             )
 
         trajectories[(k, p)] = cached_trajectories
-        kprint(
-            f"Trajectories ready: k={k}, p={p}, count={trajectory_count}"
-        )
+        kprint(f"Trajectories ready: k={k}, p={p}, count={trajectory_count}")
     return trajectories
 
 
@@ -375,9 +375,7 @@ def _empty_checkpoint(
         "next_flat_index": 0,
         "k_est": np.full(result_shape, np.nan, dtype=np.float64),
         "errors": np.full(result_shape, np.nan, dtype=np.float64),
-        "results": np.full(
-            (*result_shape, step_count), -1, dtype=np.int8
-        ),
+        "results": np.full((*result_shape, step_count), -1, dtype=np.int8),
     }
 
 
@@ -388,7 +386,10 @@ def _validate_checkpoint_state(
 ) -> None:
     total = int(np.prod(result_shape))
     next_flat_index = state["next_flat_index"]
-    if not isinstance(next_flat_index, int) or not 0 <= next_flat_index <= total:
+    if (
+        not isinstance(next_flat_index, int)
+        or not 0 <= next_flat_index <= total
+    ):
         raise RuntimeError(f"Invalid checkpoint index: {next_flat_index}")
     if state["k_est"].shape != result_shape:
         raise RuntimeError("Invalid k_est checkpoint shape")
@@ -403,7 +404,9 @@ def _validate_checkpoint_state(
         :next_flat_index
     ]
     if not np.all(np.isfinite(completed_k)):
-        raise RuntimeError("Completed checkpoint prefix has missing k_est values")
+        raise RuntimeError(
+            "Completed checkpoint prefix has missing k_est values"
+        )
     if not np.all(np.isfinite(completed_errors)):
         raise RuntimeError("Completed checkpoint prefix has missing errors")
     if np.any(completed_results < 0):
@@ -577,8 +580,7 @@ def run(
     )
 
     probabilistic_params = {
-        k: StructureInformedBayesParams(1e-3, 0.01)
-        for k in K_VALUES
+        k: StructureInformedBayesParams(1e-3, 0.01) for k in K_VALUES
     }
     hybrid_params = {
         k: HybridParams(
@@ -625,7 +627,9 @@ def run(
 
         current_state: dict[str, dict[str, Any]] = {}
 
-        def no_approximation(analyzer: Any, p_index: int, trj_index: int) -> None:
+        def no_approximation(
+            analyzer: Any, p_index: int, trj_index: int
+        ) -> None:
             del analyzer, p_index, trj_index
 
         def use_dm_approximation(
@@ -705,9 +709,7 @@ def run(
                     state["next_flat_index"] % CHECKPOINT_INTERVAL == 0
                     or state["next_flat_index"] == total
                 ):
-                    _save_analyzer_checkpoint(
-                        checkpoint_path, metadata, state
-                    )
+                    _save_analyzer_checkpoint(checkpoint_path, metadata, state)
                     kprint(
                         f"Checkpoint {analyzer_name}, k={k}: "
                         f"{state['next_flat_index']}/{total}"
@@ -725,9 +727,7 @@ def run(
 
         dm_summary = summarized(DistanceMatrixAnalyzer.name())
         np_summary = summarized(NeymanPearsonAnalyzer.name())
-        sib_summary = summarized(
-            StructureInformedBayesAnalyzer.name()
-        )
+        sib_summary = summarized(StructureInformedBayesAnalyzer.name())
         hybrid_summary = summarized(HybridAnalyzer.name())
         title = str(r"Trapping probability, $k$=") + f"{k}"
         figure_8_data, figure_13_data = _figure_error_data(

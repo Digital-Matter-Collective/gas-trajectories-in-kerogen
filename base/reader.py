@@ -1,8 +1,10 @@
 import re
-from typing import IO, Any, Tuple, List
-import numpy.typing as npt
-import numpy as np
 from io import TextIOWrapper
+from typing import IO, Any, List, Optional, Tuple, cast
+
+import numpy as np
+import numpy.typing as npt
+
 from base.kerogendata import AtomData
 
 
@@ -43,7 +45,7 @@ class Reader:
     @staticmethod
     def read_structures_by_num(
         path_to_structure: str, indexes: List[int]
-    ) -> List[Tuple[int, int, List[AtomData], Tuple[float, float, float]]]:
+    ) -> List[Tuple[int, int, npt.NDArray[Any], Tuple[float, float, float]]]:
         structures = []
         info = StepsInfo()
         indexes_set = set(indexes)
@@ -113,7 +115,7 @@ class Reader:
     @staticmethod
     def read_pnm_ext_linklist(
         filename: str,
-    ) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.int32]]:
+    ) -> Tuple[npt.NDArray[np.int32], npt.NDArray[np.float32]]:
         count = -1
         with open(filename) as f:
             if count == -1:
@@ -153,11 +155,11 @@ class Reader:
         return _TYPE_MAP.get(type[0].lower(), -1)
 
     @staticmethod
-    def read_raw_struct(path_to_structure: str) -> Tuple[Any]:
+    def read_raw_struct(path_to_structure: str) -> Tuple[Any, Any]:
         with open(path_to_structure) as f:
             atoms, size, _ = Reader.read_raw_struct_ff(f)
-        atoms = np.array(atoms)
-        return atoms, size
+        atoms_arr = np.array(atoms)
+        return atoms_arr, size
 
     @staticmethod
     def read_head_struct(f, info: StepsInfo | None = None) -> Tuple[int, int]:
@@ -173,7 +175,9 @@ class Reader:
     @staticmethod
     def read_raw_struct_ff(
         f: TextIOWrapper,
-    ) -> Tuple[List[AtomData], Tuple[float, float, float], int]:
+    ) -> Tuple[
+        Optional[npt.NDArray[Any]], Optional[Tuple[float, float, float]], int
+    ]:
         simul_num, time = Reader.read_head_struct(f)
         if simul_num == -1:
             return None, None, simul_num
@@ -183,11 +187,11 @@ class Reader:
     @staticmethod
     def read_raw_struct_ff_main(
         f: TextIOWrapper,
-    ) -> Tuple[List[AtomData], Tuple[float, float, float]]:
+    ) -> Tuple[npt.NDArray[Any], Tuple[float, float, float]]:
         count_atoms = int(next(f))
         lines = [next(f) for _ in range(count_atoms)]
 
-        krg_lines = [l for l in lines if l[5:8] == 'KRG']
+        krg_lines = [line for line in lines if line[5:8] == 'KRG']
         n = len(krg_lines)
 
         coords = np.empty((n, 3), dtype=np.float32)
@@ -196,15 +200,15 @@ class Reader:
         atom_ids: List[str] = []
         type_ids = np.empty(n, dtype=np.int8)
 
-        for i, l in enumerate(krg_lines):
-            struct_numbers[i] = int(l[0:5])
-            struct_types.append(l[5:8])
-            aid = l[8:15].strip()
+        for i, line in enumerate(krg_lines):
+            struct_numbers[i] = int(line[0:5])
+            struct_types.append(line[5:8])
+            aid = line[8:15].strip()
             atom_ids.append(aid)
             type_ids[i] = Reader.type_to_type_id(aid)
-            coords[i, 0] = float(l[20:28])
-            coords[i, 1] = float(l[28:36])
-            coords[i, 2] = float(l[36:44])
+            coords[i, 0] = float(line[20:28])
+            coords[i, 1] = float(line[28:36])
+            coords[i, 2] = float(line[36:44])
 
         atoms = np.array(
             [
@@ -220,7 +224,8 @@ class Reader:
         )
 
         cell_sizes = next(f)
-        size = tuple(float(x) for x in cell_sizes.split() if x)
+        size_values = [float(x) for x in cell_sizes.split() if x]
+        size = (size_values[0], size_values[1], size_values[2])
         return atoms, size
 
     @staticmethod
@@ -232,6 +237,7 @@ class Reader:
         is_end = skip_line(f, count_atoms + 1)
         return is_end
 
+    @staticmethod
     def skip_struct_main_part(f: TextIOWrapper) -> bool:
         count_atoms = int(next(f))
         is_end = skip_line(f, count_atoms + 1)
@@ -320,4 +326,4 @@ class Reader:
 
     @staticmethod
     def read_np_img(path: str) -> npt.NDArray[np.int32]:
-        return np.load(path)
+        return cast(npt.NDArray[np.int32], np.load(path))

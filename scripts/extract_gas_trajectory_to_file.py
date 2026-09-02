@@ -1,5 +1,5 @@
-from pathlib import Path
 import argparse
+from pathlib import Path
 
 from utils.gro_trajectory import TrajectoryStepsInfo, filter_trajectory
 

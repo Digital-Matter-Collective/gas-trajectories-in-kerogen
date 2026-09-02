@@ -1,5 +1,6 @@
 import pickle
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
@@ -101,10 +102,12 @@ def test_seed_and_figure_contract_are_saved_without_code_fingerprint() -> None:
 
     assert manifest["seed"] == 42
     assert manifest["k_est_definition"] == "N_t / (N_0 + N_t)"
-    assert tuple(manifest["figure_8"]["algorithms"]) == FIGURE_8_ANALYZERS
-    assert tuple(manifest["figure_13"]["algorithms"]) == FIGURE_13_ANALYZERS
-    assert manifest["figure_8"]["corridor"] == "20th-80th percentile"
-    assert manifest["figure_13"]["corridor"] == "20th-80th percentile"
+    figure_8 = cast(dict, manifest["figure_8"])
+    figure_13 = cast(dict, manifest["figure_13"])
+    assert tuple(figure_8["algorithms"]) == FIGURE_8_ANALYZERS
+    assert tuple(figure_13["algorithms"]) == FIGURE_13_ANALYZERS
+    assert figure_8["corridor"] == "20th-80th percentile"
+    assert figure_13["corridor"] == "20th-80th percentile"
     assert "fingerprint" not in manifest
     assert "version" not in manifest
 
@@ -127,8 +130,7 @@ def test_figures_share_dm_and_sib_data_statistics_and_colors() -> None:
     assert ERROR_CORRIDOR_QUANTILES == (0.2, 0.8)
     assert set(figure_8) | set(figure_13) <= set(ERROR_SERIES_COLORS)
     assert (
-        ERROR_SERIES_COLORS["SIB"]
-        == ERROR_SERIES_COLORS["NP + Bayesian (SIB)"]
+        ERROR_SERIES_COLORS["SIB"] == ERROR_SERIES_COLORS["NP + Bayesian (SIB)"]
     )
 
     q_low, q_high = ERROR_CORRIDOR_QUANTILES

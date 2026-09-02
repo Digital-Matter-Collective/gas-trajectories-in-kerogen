@@ -18,9 +18,9 @@ class _ConstantFitter:
 
 
 def _make_trajectory(n: int = 12) -> Trajectory:
-    points = np.cumsum(
-        np.ones((n, 3), dtype=np.float32) * 0.1, axis=0
-    ).astype(np.float32)
+    points = np.cumsum(np.ones((n, 3), dtype=np.float32) * 0.1, axis=0).astype(
+        np.float32
+    )
     times = np.arange(n, dtype=np.float32)
     box = BoundingBox(Range(0, 100), Range(0, 100), Range(0, 100))
     return Trajectory(points=points, times=times, box=box)

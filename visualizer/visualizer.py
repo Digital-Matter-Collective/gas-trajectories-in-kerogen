@@ -1,6 +1,9 @@
-import random
+import sys
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from enum import Enum
+from os.path import realpath
+from pathlib import Path
+from typing import Any, List, Optional, Tuple
 
 import matplotlib.pylab as plt
 import networkx as nx
@@ -9,47 +12,45 @@ import numpy.typing as npt
 import vtk
 from skimage import measure
 from vtkmodules.vtkCommonColor import vtkNamedColors
-from vtkmodules.vtkCommonCore import vtkDoubleArray, vtkPoints
-from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData, vtkLine
+from vtkmodules.vtkCommonCore import vtkCommand, vtkDoubleArray, vtkPoints
+from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkLine, vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
 from vtkmodules.vtkFiltersSources import (
+    vtkCubeSource,
     vtkLineSource,
     vtkSphereSource,
-    vtkCubeSource,
 )
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
+from vtkmodules.vtkIOImage import (
+    vtkBMPWriter,
+    vtkJPEGWriter,
+    vtkPNGWriter,
+    vtkTIFFWriter,
+)
 from vtkmodules.vtkRenderingAnnotation import vtkCubeAxesActor
 from vtkmodules.vtkRenderingCore import (
     vtkActor,
+    vtkCamera,
     vtkColorTransferFunction,
     vtkPolyDataMapper,
     vtkRenderer,
     vtkRenderWindow,
     vtkRenderWindowInteractor,
-    vtkCamera,
     vtkWindowToImageFilter,
 )
-from vtkmodules.vtkRenderingOpenGL2 import vtkOpenGLRenderer, vtkOpenGLSkybox
-from vtkmodules.vtkIOImage import (
-    vtkPNGWriter,
-    vtkJPEGWriter,
-    vtkTIFFWriter,
-    vtkBMPWriter,
-)
-
-import sys
-from pathlib import Path
-from os.path import realpath
-from enum import Enum
+from vtkmodules.vtkRenderingOpenGL2 import vtkOpenGLRenderer
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from visualizer.win_struct_collection import WinStructCollection
-from base.boundingbox import BoundingBox
-from base.trajectory import Trajectory
+from base.boundingbox import BoundingBox  # noqa: E402
+from base.trajectory import Trajectory  # noqa: E402
+from visualizer.timer_callback_camera import (  # noqa: E402
+    vtkTimerCallbackCamera,
+)
+from visualizer.win_struct_collection import WinStructCollection  # noqa: E402
 
 
 def visualize_trajectory(
@@ -102,7 +103,7 @@ class vtkTimerCallbackActors:
         self.steps = data[0].points.shape[0]
         self.data = data
         self.iren = iren
-        self.timerId = None
+        self.timerId: Optional[int] = None
 
     def execute(self, obj, event) -> None:
         step = 0
@@ -182,7 +183,7 @@ class Visualizer:
 
         positions = None
         corr = None
-        if type(dict()) == type(node_pos_corr):
+        if isinstance(node_pos_corr, dict):
             nums = np.array(list(node_pos_corr.keys()), dtype=int)
             positions = np.zeros(shape=(nums.shape[0], 3), dtype=float)
             corr = np.zeros(shape=(nums.max() + 1,), dtype=int)
@@ -244,7 +245,7 @@ class Visualizer:
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
             cb = vtkTimerCallbackCamera(5000, [], [camera], iren)
-            iren.AddObserver('TimerEvent', cb.execute)
+            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
         renWin.Render()
@@ -284,7 +285,7 @@ class Visualizer:
 
         positions = None
         corr = None
-        if type(dict()) == type(node_pos_corr):
+        if isinstance(node_pos_corr, dict):
             nums = np.array(list(node_pos_corr.keys()), dtype=int)
             positions = np.zeros(shape=(nums.shape[0], 3), dtype=float)
             corr = np.zeros(shape=(nums.max() + 1,), dtype=int)
@@ -333,7 +334,7 @@ class Visualizer:
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
             cb = vtkTimerCallbackCamera(5000, [], [camera], iren)
-            iren.AddObserver('TimerEvent', cb.execute)
+            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
         renWin.Render()
@@ -376,7 +377,7 @@ class Visualizer:
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
             cb = vtkTimerCallbackCamera(5000, [], cameras, iren)
-            iren.AddObserver('TimerEvent', cb.execute)
+            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
         rw.SetSize(1900, 1080)
@@ -624,9 +625,6 @@ class Visualizer:
             image_data.AllocateScalars(vtk.VTK_FLOAT, 1)
 
         if bbox is not None:
-            bbs = bbox.size()
-            # t = [bs / iis for iis, bs in zip(size, bbs)]
-            # image_data.SetSpacing(*t)
             spacing = np.asarray(bbox.size(), dtype=float) / (
                 np.asarray(img.shape, dtype=float) - 1.0
             )
@@ -695,7 +693,7 @@ class Visualizer:
         mapper.SetLookupTable(lut)
         mapper.SetScalarRange(0, 2)
 
-        actor = vtk.vtkActor()
+        actor = vtkActor()
         actor.SetMapper(mapper)
         actor.GetProperty().SetOpacity(kwargs["img_opacity"])
         return actor
@@ -733,7 +731,9 @@ class Visualizer:
     ) -> None:
         ren = vtkRenderer()
 
-        Visualizer.add_img_actor(ren, img, bbox, volume_mode=volume_mode, **kwargs)
+        Visualizer.add_img_actor(
+            ren, img, bbox, volume_mode=volume_mode, **kwargs
+        )
 
         colors = vtkNamedColors()
         ren.SetBackground(colors.GetColor3d("White"))
@@ -764,8 +764,8 @@ class Visualizer:
 
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
-            cb = vtk.vtkTimerCallbackCamera(5000, [], [camera], iren)
-            iren.AddObserver('TimerEvent', cb.execute)
+            cb = vtkTimerCallbackCamera(5000, [], [camera], iren)
+            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
         renWin.Render()
@@ -784,7 +784,9 @@ class Visualizer:
     ) -> None:
         renderer = vtkOpenGLRenderer()
 
-        Visualizer.add_img_actor(renderer, img, bbox, volume_mode=False, **kwargs)
+        Visualizer.add_img_actor(
+            renderer, img, bbox, volume_mode=False, **kwargs
+        )
 
         colors = vtkNamedColors()
         renderer.SetBackground(colors.GetColor3d("White"))
@@ -812,8 +814,8 @@ class Visualizer:
 
         if 'animation' in kwargs:
             # Sign up to receive TimerEvent
-            cb = vtk.vtkTimerCallbackCamera(5000, [], [camera], iren)
-            iren.AddObserver('TimerEvent', cb.execute)
+            cb = vtkTimerCallbackCamera(5000, [], [camera], iren)
+            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
             cb.timerId = iren.CreateRepeatingTimer(500)
 
         win_col = WinStructCollection(iren)
@@ -856,7 +858,7 @@ class Visualizer:
         wrap_mode: WrapMode = WrapMode.EMPTY,
         with_points: bool = False,
         window_name: str = 'Trajectory',
-        radius: int = 1,
+        radius: float = 1,
     ) -> None:
         # renderer = vtkRenderer()
         renderer = vtkOpenGLRenderer()
@@ -969,8 +971,10 @@ class Visualizer:
     @staticmethod
     def create_box_actor2(box: BoundingBox) -> vtkActor:
         lineSource = vtkLineSource()
-        lineSource.SetPoint1(box.min())
-        lineSource.SetPoint2(box.max())
+        bmin = box.min()
+        bmax = box.max()
+        lineSource.SetPoint1(float(bmin[0]), float(bmin[1]), float(bmin[2]))
+        lineSource.SetPoint2(float(bmax[0]), float(bmax[1]), float(bmax[2]))
 
         colors = vtkNamedColors()
         outline = vtkOutlineFilter()
@@ -989,7 +993,7 @@ class Visualizer:
         data = colors.GetColor3d("Black")
 
         axes = vtkCubeAxesActor()
-        axes.SetUseTextActor3D(2)
+        axes.SetUseTextActor3D(True)
         axes.SetBounds(bbox.aminmax())
         axes.SetCamera(camera)
         axes.GetXAxesLinesProperty().SetColor(data)
@@ -1051,7 +1055,7 @@ class Visualizer:
         points: npt.NDArray[np.float32],
         colors: npt.NDArray[np.float32],
         radius: float,
-    ) -> vtkActor:
+    ) -> Tuple[vtkActor, vtkPolyData, vtkTubeFilter]:
         count_points = points.shape[0]
 
         ctf = vtkColorTransferFunction()
@@ -1108,8 +1112,8 @@ class Visualizer:
         mapper.SetLookupTable(ctf)
         mapper.Update()
 
-        colors = vtkNamedColors()
-        color = colors.GetColor3d("hotpink")
+        vtk_colors = vtkNamedColors()
+        color = vtk_colors.GetColor3d("hotpink")
 
         actor = vtkActor()
         actor.SetMapper(mapper)
@@ -1127,7 +1131,7 @@ class Visualizer:
     def create_trj_points_actor(
         trj: Trajectory,
         **kwargs,
-    ) -> None:
+    ) -> vtkActor:
         tp = (
             trj.points_without_periodic
             if not kwargs["periodic"]
@@ -1151,6 +1155,7 @@ class Visualizer:
         for i in range(pcount):
             points.SetPoint(i, tp[i, 0], tp[i, 1], tp[i, 2])
             if kwargs["color_type"] == 'clusters':
+                assert trj.traps is not None
                 zero_trap = (
                     (i > 0 and i < pcount - 2)
                     and not trj.traps[i]
@@ -1211,12 +1216,16 @@ class Visualizer:
 
     @staticmethod
     def draw_trajectory_points(trj: Trajectory) -> None:
-        actor = Visualizer.create_trj_points_actor(trj)
+        actor = Visualizer.create_trj_points_actor(
+            trj, periodic=False, color_type='dist', radius=1.0
+        )
 
         renderer = vtkRenderer()
         renderer.AddActor(actor)
 
-        trj_actor = Visualizer.create_trajectory_actor(trj, False)
+        trj_actor = Visualizer.create_trajectory_actor(
+            trj, periodic=False, color_type='dist', radius=1.0
+        )
         renderer.AddActor(trj_actor)
 
         colors = vtkNamedColors()
@@ -1280,8 +1289,8 @@ class Visualizer:
 
         # Add the actors
         size = img.shape
-        fpos = size[0] / 2, size[1] / 2, size[2] / 2
-        cpos = size[0] * 2, size[1] * 2, size[2] * 2
+        fpos = np.array([size[0] / 2, size[1] / 2, size[2] / 2])
+        cpos = np.array([size[0] * 2, size[1] * 2, size[2] * 2])
         if bbox is not None:
             fpos = bbox.center()
             cpos = bbox.center() + np.array([*(bbox.size())])
@@ -1351,7 +1360,7 @@ class Visualizer:
         iren.Initialize()
 
         cb = vtkTimerCallbackActors(data, iren)
-        iren.AddObserver('TimerEvent', cb.execute)
+        iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
         cb.timerId = iren.CreateRepeatingTimer(2000)
 
         renWin.Render()

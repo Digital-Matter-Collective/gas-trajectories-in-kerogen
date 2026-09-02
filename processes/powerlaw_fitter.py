@@ -6,8 +6,8 @@ Equation numbers in comments reference that paper.
 """
 
 import warnings
-from dataclasses import dataclass, field
-from typing import Callable, Optional, Tuple
+from dataclasses import dataclass
+from typing import Callable, Tuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -18,8 +18,8 @@ from scipy.special import erfc
 # --------------------------------------------------------------------- #
 # Constants
 # --------------------------------------------------------------------- #
-MIN_TAIL_SIZE: int = 10      # minimum observations above x_min for valid fit
-_CCDF_GRID_PTS: int = 1000   # grid points for PLC CCDF numerical integration
+MIN_TAIL_SIZE: int = 10  # minimum observations above x_min for valid fit
+_CCDF_GRID_PTS: int = 1000  # grid points for PLC CCDF numerical integration
 
 
 # --------------------------------------------------------------------- #
@@ -31,27 +31,27 @@ class FitResult:
     n_tail: int
 
     # Power law
-    alpha: float          # MLE exponent (eq 3.1)
-    alpha_sigma: float    # standard error (eq 3.2)
-    D_pl: float           # KS statistic (eq 3.9)
-    p_mc_pl: float        # Monte Carlo p-value (sec 4.1); NaN if not computed
+    alpha: float  # MLE exponent (eq 3.1)
+    alpha_sigma: float  # standard error (eq 3.2)
+    D_pl: float  # KS statistic (eq 3.9)
+    p_mc_pl: float  # Monte Carlo p-value (sec 4.1); NaN if not computed
 
     # Exponential
-    lam_exp: float        # MLE rate parameter
-    D_exp: float          # KS statistic
+    lam_exp: float  # MLE rate parameter
+    D_exp: float  # KS statistic
 
     # Power law with exponential cutoff
-    alpha_plc: float      # MLE exponent
-    lam_plc: float        # MLE cutoff rate
-    D_plc: float          # KS statistic
+    alpha_plc: float  # MLE exponent
+    lam_plc: float  # MLE cutoff rate
+    D_plc: float  # KS statistic
 
     # Standalone MC goodness-of-fit p-values
-    p_mc_exp: float      # MC p-value for exponential; NaN if not computed
-    p_mc_plc: float      # MC p-value for PLC (fast bootstrap); NaN if not computed
+    p_mc_exp: float  # MC p-value for exponential; NaN if not computed
+    p_mc_plc: float  # MC p-value for PLC (fast bootstrap); NaN if not computed
 
     # Vuong likelihood ratio tests (Appendix C, eq C.6)
-    vuong_p_pl_vs_exp: float    # two-sided p-value
-    vuong_sign_pl_vs_exp: int   # +1 if PL favoured, -1 if Exp favoured
+    vuong_p_pl_vs_exp: float  # two-sided p-value
+    vuong_sign_pl_vs_exp: int  # +1 if PL favoured, -1 if Exp favoured
     vuong_p_pl_vs_plc: float
     vuong_sign_pl_vs_plc: int
 
@@ -59,6 +59,7 @@ class FitResult:
 # --------------------------------------------------------------------- #
 # MLE estimators
 # --------------------------------------------------------------------- #
+
 
 def fit_powerlaw(
     x: npt.NDArray[np.float64],
@@ -88,7 +89,9 @@ def fit_powerlaw(
 
     sum_log = np.sum(np.log(x_tail / xmin))
     if sum_log <= 0.0:
-        raise ValueError("sum_log <= 0: all values equal xmin or xmin too large")
+        raise ValueError(
+            "sum_log <= 0: all values equal xmin or xmin too large"
+        )
 
     alpha_hat = 1.0 + n / sum_log
     sigma = (alpha_hat - 1.0) / np.sqrt(n)
@@ -110,10 +113,11 @@ def fit_exponential(
         raise ValueError(f"n_tail={n} < MIN_TAIL_SIZE={MIN_TAIL_SIZE}")
 
     excess_mean = np.mean(x_tail) - xmin
+    lam_hat: float
     if excess_mean <= 0.0:
-        lam_hat = np.finfo(float).max
+        lam_hat = float(np.finfo(float).max)
     else:
-        lam_hat = 1.0 / excess_mean
+        lam_hat = float(1.0 / excess_mean)
     return float(lam_hat), n
 
 
@@ -136,13 +140,14 @@ def _plc_normalization(alpha: float, lam: float, xmin: float) -> float:
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        I, _ = quad(integrand, 1.0, np.inf, epsabs=1e-12, epsrel=1e-8,
-                    limit=200)
+        integral_value, _ = quad(
+            integrand, 1.0, np.inf, epsabs=1e-12, epsrel=1e-8, limit=200
+        )
 
-    if not np.isfinite(I) or I <= 0.0:
+    if not np.isfinite(integral_value) or integral_value <= 0.0:
         return 0.0
 
-    C = xmin ** (1.0 - alpha) * I
+    C = xmin ** (1.0 - alpha) * integral_value
     return float(C) if np.isfinite(C) and C > 0.0 else 0.0
 
 
@@ -183,14 +188,22 @@ def fit_plc(
     lam0 = 1.0 / excess_mean if excess_mean > 0.0 else 1.0 / xmin
 
     x0 = np.array([alpha0, lam0])
-    res = minimize(nll, x0, method='Nelder-Mead',
-                   options={'xatol': 1e-8, 'fatol': 1e-8, 'maxiter': 20000})
+    res = minimize(
+        nll,
+        x0,
+        method='Nelder-Mead',
+        options={'xatol': 1e-8, 'fatol': 1e-8, 'maxiter': 20000},
+    )
 
     if (not res.success) or (not np.isfinite(res.fun)) or (res.fun >= 1e14):
         # fallback: L-BFGS-B with explicit bounds
-        res = minimize(nll, x0, method='L-BFGS-B',
-                       bounds=[(1.001, 20.0), (0.0, 1e15)],
-                       options={'ftol': 1e-12, 'gtol': 1e-8, 'maxiter': 5000})
+        res = minimize(
+            nll,
+            x0,
+            method='L-BFGS-B',
+            bounds=[(1.001, 20.0), (0.0, 1e15)],
+            options={'ftol': 1e-12, 'gtol': 1e-8, 'maxiter': 5000},
+        )
 
     alpha_opt, lam_opt = float(res.x[0]), float(res.x[1])
     return alpha_opt, lam_opt, float(res.fun), n
@@ -199,6 +212,7 @@ def fit_plc(
 # --------------------------------------------------------------------- #
 # CCDF functions
 # --------------------------------------------------------------------- #
+
 
 def pl_ccdf(
     x: npt.NDArray[np.float64],
@@ -229,9 +243,9 @@ def plc_ccdf_grid(
     log-spaced grid. Interpolated at query points x.
     """
     x_max = max(np.max(x) * 100.0, xmin * 1e6)
-    grid = np.logspace(np.log10(xmin * (1.0 - 1e-10)),
-                       np.log10(x_max),
-                       _CCDF_GRID_PTS)
+    grid = np.logspace(
+        np.log10(xmin * (1.0 - 1e-10)), np.log10(x_max), _CCDF_GRID_PTS
+    )
 
     with np.errstate(over='ignore', under='ignore'):
         exp_vals = np.exp(-lam * grid)
@@ -245,12 +259,15 @@ def plc_ccdf_grid(
     cdf = cdf_unnorm / total
     ccdf = np.clip(1.0 - cdf, 0.0, 1.0)
 
-    return np.clip(np.interp(x, grid, ccdf), 0.0, 1.0)
+    return cast(
+        npt.NDArray[np.float64], np.clip(np.interp(x, grid, ccdf), 0.0, 1.0)
+    )
 
 
 # --------------------------------------------------------------------- #
 # KS statistic (Clauset eq. 3.9)
 # --------------------------------------------------------------------- #
+
 
 def ks_statistic(
     x: npt.NDArray[np.float64],
@@ -270,20 +287,20 @@ def ks_statistic(
         return 1.0
 
     i = np.arange(n, dtype=float)
-    s_right = (n - i - 1) / n   # right-continuous empirical CCDF
-    s_left  = (n - i) / n       # left-continuous empirical CCDF
+    s_right = (n - i - 1) / n  # right-continuous empirical CCDF
+    s_left = (n - i) / n  # left-continuous empirical CCDF
 
     p = ccdf_fn(x_tail)
     p = np.clip(p, 0.0, 1.0)
 
-    d = max(np.max(np.abs(s_right - p)),
-            np.max(np.abs(s_left  - p)))
+    d = max(np.max(np.abs(s_right - p)), np.max(np.abs(s_left - p)))
     return float(d)
 
 
 # --------------------------------------------------------------------- #
 # Optimal x_min (Clauset sec. 3.3)
 # --------------------------------------------------------------------- #
+
 
 def find_xmin_optimal(
     x: npt.NDArray[np.float64],
@@ -300,7 +317,11 @@ def find_xmin_optimal(
     """
     candidates = np.unique(x)
     # keep enough tail: at least MIN_TAIL_SIZE observations above xmin
-    candidates = candidates[:-MIN_TAIL_SIZE] if len(candidates) > MIN_TAIL_SIZE else candidates[:1]
+    candidates = (
+        candidates[:-MIN_TAIL_SIZE]
+        if len(candidates) > MIN_TAIL_SIZE
+        else candidates[:1]
+    )
 
     best_D = np.inf
     best_xmin = candidates[0]
@@ -326,6 +347,7 @@ def find_xmin_optimal(
 # Monte Carlo p-value (Clauset sec. 4.1)
 # --------------------------------------------------------------------- #
 
+
 def mc_pvalue_pl(
     x: npt.NDArray[np.float64],
     xmin: float,
@@ -345,10 +367,9 @@ def mc_pvalue_pl(
     Returns p = fraction(KS_synth >= D_emp).
     """
     x_tail_emp = x[x >= xmin]
-    x_below    = x[x < xmin]
+    x_below = x[x < xmin]
     n_tail = len(x_tail_emp)
     n_below = len(x_below)
-    n_total = len(x)
 
     if n_tail < MIN_TAIL_SIZE or alpha_hat <= 1.0:
         return float('nan')
@@ -395,14 +416,17 @@ def mc_pvalue_pl(
 # Per-observation log-likelihoods (for Vuong test)
 # --------------------------------------------------------------------- #
 
+
 def pl_loglik(
     x_tail: npt.NDArray[np.float64],
     xmin: float,
     alpha: float,
 ) -> npt.NDArray[np.float64]:
     """Log p(x_i) under power law (eq 2.2)."""
-    return (np.log(alpha - 1.0) - np.log(xmin)
-            - alpha * np.log(x_tail / xmin))
+    return cast(
+        npt.NDArray[np.float64],
+        np.log(alpha - 1.0) - np.log(xmin) - alpha * np.log(x_tail / xmin),
+    )
 
 
 def exp_loglik(
@@ -411,7 +435,7 @@ def exp_loglik(
     lam: float,
 ) -> npt.NDArray[np.float64]:
     """Log p(x_i) under shifted exponential."""
-    return np.log(lam) - lam * (x_tail - xmin)
+    return cast(npt.NDArray[np.float64], np.log(lam) - lam * (x_tail - xmin))
 
 
 def plc_loglik(
@@ -424,12 +448,16 @@ def plc_loglik(
     """Log p(x_i) under power law with exponential cutoff."""
     if C <= 0.0:
         return np.full(len(x_tail), -np.inf)
-    return -alpha * np.log(x_tail) - lam * x_tail - np.log(C)
+    return cast(
+        npt.NDArray[np.float64],
+        -alpha * np.log(x_tail) - lam * x_tail - np.log(C),
+    )
 
 
 # --------------------------------------------------------------------- #
 # Vuong likelihood ratio test (Clauset Appendix C, eq C.6)
 # --------------------------------------------------------------------- #
+
 
 def vuong_test(
     ll1: npt.NDArray[np.float64],
@@ -466,6 +494,7 @@ def vuong_test(
 # --------------------------------------------------------------------- #
 # MC p-values for Exponential and PLC (standalone goodness-of-fit)
 # --------------------------------------------------------------------- #
+
 
 def mc_pvalue_exp(
     x: npt.NDArray[np.float64],
@@ -507,7 +536,12 @@ def mc_pvalue_exp(
         if lam_s <= 0.0:
             continue
 
-        D_s = ks_statistic(synth, xmin, lambda t, ls=lam_s: exp_ccdf(t, xmin, ls))
+        def _exp_ccdf_at(
+            t: npt.NDArray[np.float64], ls: float = lam_s
+        ) -> npt.NDArray[np.float64]:
+            return exp_ccdf(t, xmin, ls)
+
+        D_s = ks_statistic(synth, xmin, _exp_ccdf_at)
         if D_s >= D_emp:
             count_gte += 1
         valid += 1
@@ -558,7 +592,7 @@ def mc_pvalue_plc(
     ccdf_g = np.clip(1.0 - cdf_g, 0.0, 1.0)
 
     def _plc_ccdf(t: npt.NDArray) -> npt.NDArray:
-        return np.clip(np.interp(t, grid, ccdf_g), 0.0, 1.0)
+        return cast(npt.NDArray, np.clip(np.interp(t, grid, ccdf_g), 0.0, 1.0))
 
     count_gte = 0
     for _ in range(n_synth):

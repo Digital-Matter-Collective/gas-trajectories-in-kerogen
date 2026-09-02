@@ -1,13 +1,13 @@
 from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
 from typing import List, Optional
 
 import numpy as np
 import numpy.typing as npt
-from functools import cached_property
-from base.boundingbox import BoundingBox, Range
-from utils.types import NPFArray, NPBArray
 
+from base.boundingbox import BoundingBox, Range
+from utils.types import NPBArray, NPFArray
 
 _CACHED_PROPERTY_NAMES = (
     "points_without_periodic",
@@ -34,7 +34,12 @@ class Trajectory:
         for name in _CACHED_PROPERTY_NAMES:
             self.__dict__.pop(name, None)
 
-    def cut(self, start: int = 0, stop: int = None, save_dists: bool = False):
+    def cut(
+        self,
+        start: int = 0,
+        stop: Optional[int] = None,
+        save_dists: bool = False,
+    ):
         if stop is None:
             stop = len(self.points)
 
@@ -53,7 +58,6 @@ class Trajectory:
     def dists(self) -> NPFArray:
         dist = Trajectory.extractDists(self.points_without_periodic)
         return dist + self.start_dist
-        
 
     def is_intersect_borders(self) -> np.bool_:
         ppoints = self.points_without_periodic
@@ -86,7 +90,7 @@ class Trajectory:
         return np.array(dist, dtype=np.float32)
 
     @cached_property
-    def points_without_periodic(self) -> npt.NDArray[np.float64]:
+    def points_without_periodic(self) -> npt.NDArray[np.float32]:
         borders = self.box.max()
 
         npoints = np.zeros(shape=self.points.shape, dtype=np.float32)
@@ -109,7 +113,7 @@ class Trajectory:
 
     @cached_property
     def count_points(self) -> int:
-        return self.points.shape[0]
+        return int(self.points.shape[0])
 
     @cached_property
     def delta_time(self) -> float:
@@ -119,7 +123,7 @@ class Trajectory:
             float: picoseconds
         """
         assert len(self.times) >= 2
-        return self.times[1] - self.times[0]
+        return float(self.times[1] - self.times[0])
 
     @cached_property
     def delta_time_sec(self) -> float:
@@ -255,9 +259,9 @@ class Trajectory:
         coords = np.stack(frames, axis=0)
         # shape: (count_step, count_atoms, 3)
 
-        time_steps = np.array(time_steps, dtype=np.float32)
-        count_step = coords.shape[0]
+        time_steps_arr = np.array(time_steps, dtype=np.float32)
         count_atoms = coords.shape[1]
+        assert box is not None
 
         trajectories = []
 
@@ -267,7 +271,7 @@ class Trajectory:
             # Если дальше код меняет points inplace, лучше сделать copy:
             # points = coords[:, i, :].copy()
 
-            trajectories.append(Trajectory(points, time_steps, box))
+            trajectories.append(Trajectory(points, time_steps_arr, box))
 
         return trajectories
 

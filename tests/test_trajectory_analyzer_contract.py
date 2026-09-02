@@ -32,7 +32,9 @@ def test_dm_edge_label_uses_the_destination_point() -> None:
     np.testing.assert_array_equal(edge_labels, [False, True, True, False])
 
 
-def test_dm_scale_shorter_than_its_threshold_returns_a_complete_result() -> None:
+def test_dm_scale_shorter_than_its_threshold_returns_a_complete_result() -> (
+    None
+):
     analyzer = object.__new__(DistanceMatrixAnalyzer)
     point_count = 10
     threshold = np.full((12, 100), 20, dtype=np.int32)

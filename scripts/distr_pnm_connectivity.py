@@ -1,25 +1,21 @@
 import argparse
-import json
-import subprocess
 import sys
-import time
 from os import listdir
-from os.path import dirname, isfile, join, realpath
+from os.path import isfile, join, realpath
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import exponweib, weibull_min
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.reader import Reader
+from base.reader import Reader  # noqa: E402
 
 
 def build_distributions(paths: List[Tuple[str, str]]) -> None:
@@ -42,7 +38,7 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
                 [(n1, n2) for n1, n2 in zip(res[:, 0], res[:, 1])]
             )
             degrees = [val for (node, val) in graph.degree()]
-            degree_count = {}
+            degree_count: Dict[int, int] = {}
             for d in degrees:
                 if d in degree_count:
                     degree_count[d] = degree_count[d] + 1
@@ -51,11 +47,11 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
             mresult[step] = degree_count
         steps = []
         degrees = []
-        count = []
-        for s, res in mresult.items():
-            steps = steps + [s] * len(res)
-            degrees = degrees + [k for k, _ in res.items()]
-            count = count + [v for _, v in res.items()]
+        count: List[int] = []
+        for s, deg_count in mresult.items():
+            steps = steps + [s] * len(deg_count)
+            degrees = degrees + [k for k, _ in deg_count.items()]
+            count = count + [v for _, v in deg_count.items()]
         ddata = pd.DataFrame(
             list(zip(degrees, count, steps)),
             columns=['Degree', 'Count', 'Number simulation'],

@@ -1,28 +1,22 @@
 import math
-import sys
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
-from dataclasses import dataclass
 from enum import Enum
-from os.path import realpath
-from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
-import networkx as nx
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import cdist
 
 from base.boundingbox import KerogenBox, Range
-from base.kerogendata import AtomData, KerogenData
-from utils.utils import kprint
+from base.kerogendata import KerogenData
 
 
 class BinarizeAlgo(Enum):
-    SEQUENTIAL    = "sequential"
-    THREAD_SLICE  = "thread_slice"
-    THREAD_CHUNK  = "thread_chunk"
+    SEQUENTIAL = "sequential"
+    THREAD_SLICE = "thread_slice"
+    THREAD_CHUNK = "thread_chunk"
     PROCESS_CHUNK = "process_chunk"
 
 
@@ -38,43 +32,56 @@ def _proc_worker_init(
     yz_flat: "np.ndarray",
 ) -> None:
     _proc_worker_state.update(
-        bb=bb, vox_sizes=vox_sizes, mins=mins,
-        img_size=img_size, atom_chunk=atom_chunk, yz_flat=yz_flat,
+        bb=bb,
+        vox_sizes=vox_sizes,
+        mins=mins,
+        img_size=img_size,
+        atom_chunk=atom_chunk,
+        yz_flat=yz_flat,
     )
 
 
 def _proc_worker_process_chunk(chunk_indices: List[int]) -> List[tuple]:
     s = _proc_worker_state
-    bb        = s["bb"]
+    bb = s["bb"]
     vox_sizes = s["vox_sizes"]
-    mins      = s["mins"]
-    img_size  = s["img_size"]
+    mins = s["mins"]
+    img_size = s["img_size"]
     atom_chunk = s["atom_chunk"]
-    yz_flat   = s["yz_flat"]
+    yz_flat = s["yz_flat"]
     Ny, Nz = img_size[1], img_size[2]
 
     results = []
     for ix in chunk_indices:
-        gx    = float(mins[0] + (ix + 0.5) * vox_sizes[0])
+        gx = float(mins[0] + (ix + 0.5) * vox_sizes[0])
         x_col = np.full((Ny * Nz, 1), gx, dtype=np.float32)
-        pos   = np.hstack([x_col, yz_flat])
+        pos = np.hstack([x_col, yz_flat])
         atom_mask = np.zeros(Ny * Nz, dtype=bool)
         for bb_entry in bb:
             in_bb = (
-                (pos[:, 0] >= bb_entry.xb_.min_) & (pos[:, 0] <= bb_entry.xb_.max_)
-                & (pos[:, 1] >= bb_entry.yb_.min_) & (pos[:, 1] <= bb_entry.yb_.max_)
-                & (pos[:, 2] >= bb_entry.zb_.min_) & (pos[:, 2] <= bb_entry.zb_.max_)
+                (pos[:, 0] >= bb_entry.xb_.min_)
+                & (pos[:, 0] <= bb_entry.xb_.max_)
+                & (pos[:, 1] >= bb_entry.yb_.min_)
+                & (pos[:, 1] <= bb_entry.yb_.max_)
+                & (pos[:, 2] >= bb_entry.zb_.min_)
+                & (pos[:, 2] <= bb_entry.zb_.max_)
             )
             if not in_bb.any() or len(bb_entry.positions) == 0:
                 continue
-            pos_in  = pos[in_bb]
+            pos_in = pos[in_bb]
             mask_in = np.zeros(int(in_bb.sum()), dtype=bool)
             for a_start in range(0, len(bb_entry.positions), atom_chunk):
-                dists   = cdist(pos_in, bb_entry.positions[a_start : a_start + atom_chunk])
-                mask_in |= (dists < bb_entry.atom_sizes[a_start : a_start + atom_chunk]).any(axis=1)
+                dists = cdist(
+                    pos_in, bb_entry.positions[a_start : a_start + atom_chunk]
+                )
+                mask_in |= (
+                    dists < bb_entry.atom_sizes[a_start : a_start + atom_chunk]
+                ).any(axis=1)
             atom_mask[in_bb] |= mask_in
         results.append((ix, (~atom_mask).reshape(Ny, Nz).astype(np.int8)))
-    print(f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!")
+    print(
+        f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!"
+    )
     return results
 
 
@@ -178,7 +185,9 @@ class Segmentator:
     @staticmethod
     def _make_chunks(total: int, chunk_size: int) -> List[List[int]]:
         indices = list(range(total))
-        return [indices[i : i + chunk_size] for i in range(0, total, chunk_size)]
+        return [
+            indices[i : i + chunk_size] for i in range(0, total, chunk_size)
+        ]
 
     def binarize(
         self,
@@ -189,10 +198,17 @@ class Segmentator:
     ) -> npt.NDArray[np.int8]:
         """Return 3D image where 0 = atom, 1 = void."""
         if algo is None:
-            algo = BinarizeAlgo.SEQUENTIAL if num_workers == 0 else BinarizeAlgo.THREAD_SLICE
+            algo = (
+                BinarizeAlgo.SEQUENTIAL
+                if num_workers == 0
+                else BinarizeAlgo.THREAD_SLICE
+            )
 
         vox_sizes = np.array(
-            [ker_s / float(img_s) for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)],
+            [
+                ker_s / float(img_s)
+                for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
+            ],
             dtype=np.float32,
         )
         mins = self.kerogen.box.min()
@@ -205,23 +221,30 @@ class Segmentator:
         img = np.ones(self.img_size, dtype=np.int8)
 
         def process_slice(ix: int) -> npt.NDArray[np.int8]:
-            gx    = float(mins[0] + (ix + 0.5) * vox_sizes[0])
+            gx = float(mins[0] + (ix + 0.5) * vox_sizes[0])
             x_col = np.full((Ny * Nz, 1), gx, dtype=np.float32)
-            pos   = np.hstack([x_col, yz_flat])
+            pos = np.hstack([x_col, yz_flat])
             atom_mask = np.zeros(Ny * Nz, dtype=bool)
             for bb in self.bb:
                 in_bb = (
-                    (pos[:, 0] >= bb.xb_.min_) & (pos[:, 0] <= bb.xb_.max_)
-                    & (pos[:, 1] >= bb.yb_.min_) & (pos[:, 1] <= bb.yb_.max_)
-                    & (pos[:, 2] >= bb.zb_.min_) & (pos[:, 2] <= bb.zb_.max_)
+                    (pos[:, 0] >= bb.xb_.min_)
+                    & (pos[:, 0] <= bb.xb_.max_)
+                    & (pos[:, 1] >= bb.yb_.min_)
+                    & (pos[:, 1] <= bb.yb_.max_)
+                    & (pos[:, 2] >= bb.zb_.min_)
+                    & (pos[:, 2] <= bb.zb_.max_)
                 )
                 if not in_bb.any() or len(bb.positions) == 0:
                     continue
-                pos_in  = pos[in_bb]
+                pos_in = pos[in_bb]
                 mask_in = np.zeros(int(in_bb.sum()), dtype=bool)
                 for a_start in range(0, len(bb.positions), atom_chunk):
-                    dists   = cdist(pos_in, bb.positions[a_start : a_start + atom_chunk])
-                    mask_in |= (dists < bb.atom_sizes[a_start : a_start + atom_chunk]).any(axis=1)
+                    dists = cdist(
+                        pos_in, bb.positions[a_start : a_start + atom_chunk]
+                    )
+                    mask_in |= (
+                        dists < bb.atom_sizes[a_start : a_start + atom_chunk]
+                    ).any(axis=1)
                 atom_mask[in_bb] |= mask_in
             return (~atom_mask).reshape(Ny, Nz).astype(np.int8)
 
@@ -233,7 +256,9 @@ class Segmentator:
         elif algo == BinarizeAlgo.THREAD_SLICE:
             n = min(num_workers, Nx)
             with ThreadPoolExecutor(max_workers=n) as executor:
-                for ix, result in enumerate(executor.map(process_slice, range(Nx))):
+                for ix, result in enumerate(
+                    executor.map(process_slice, range(Nx))
+                ):
                     img[ix] = result
                     print(f" --- Slice {ix}-x finished!")
 
@@ -243,11 +268,15 @@ class Segmentator:
 
             def process_chunk_thread(chunk_indices: List[int]) -> List[tuple]:
                 results = [(ix, process_slice(ix)) for ix in chunk_indices]
-                print(f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!")
+                print(
+                    f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!"
+                )
                 return results
 
             with ThreadPoolExecutor(max_workers=n) as executor:
-                futures = [executor.submit(process_chunk_thread, ch) for ch in chunks]
+                futures = [
+                    executor.submit(process_chunk_thread, ch) for ch in chunks
+                ]
                 for fut in futures:
                     for ix, result in fut.result():
                         img[ix] = result
@@ -258,9 +287,19 @@ class Segmentator:
             with ProcessPoolExecutor(
                 max_workers=n,
                 initializer=_proc_worker_init,
-                initargs=(self.bb, vox_sizes, mins, self.img_size, atom_chunk, yz_flat),
-            ) as executor:
-                futures = [executor.submit(_proc_worker_process_chunk, ch) for ch in chunks]
+                initargs=(
+                    self.bb,
+                    vox_sizes,
+                    mins,
+                    self.img_size,
+                    atom_chunk,
+                    yz_flat,
+                ),
+            ) as process_executor:
+                futures = [
+                    process_executor.submit(_proc_worker_process_chunk, ch)
+                    for ch in chunks
+                ]
                 for fut in futures:
                     for ix, result in fut.result():
                         img[ix] = result
@@ -281,7 +320,12 @@ class Segmentator:
         for algo in algos:
             print(f" --- [benchmark] Starting {algo.value} ...")
             t0 = time.perf_counter()
-            self.binarize(num_workers=num_workers, atom_chunk=atom_chunk, algo=algo, chunk_size=chunk_size)
+            self.binarize(
+                num_workers=num_workers,
+                atom_chunk=atom_chunk,
+                algo=algo,
+                chunk_size=chunk_size,
+            )
             results[algo.value] = time.perf_counter() - t0
             print(f" --- [benchmark] {algo.value}: {results[algo.value]:.3f}s")
 

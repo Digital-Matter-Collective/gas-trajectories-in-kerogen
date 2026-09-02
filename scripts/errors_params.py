@@ -3,7 +3,7 @@ import pickle
 import random
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -235,13 +235,16 @@ def run(
                 throat_fitter,
                 k=k,
                 p=p,
-                seed=int(metadata["pair_seed"]),
+                seed=int(cast(int, metadata["pair_seed"])),
             )
             trajectories = [
                 simulator.run(trajectory_points)
                 for _ in range(trajectory_count)
             ]
-            ground_truth = [trj.traps.copy() for trj in trajectories]
+            ground_truth = []
+            for trj in trajectories:
+                assert trj.traps is not None
+                ground_truth.append(trj.traps.copy())
             for scale_index, scale_candidates in enumerate(CANDIDATE_GRID):
                 if scale_index in completed_scales:
                     completed_candidates += len(scale_candidates)

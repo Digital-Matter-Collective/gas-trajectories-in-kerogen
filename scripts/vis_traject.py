@@ -1,17 +1,6 @@
 import argparse
-import os
-import sys
-import time
-from os.path import realpath
-from pathlib import Path
-from typing import List, Tuple
 import pickle
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import seaborn as sns
-from skimage import measure
-
+from pathlib import Path
 
 from base.trajectory import Trajectory
 from visualizer.visualizer import Visualizer, WrapMode
@@ -44,10 +33,14 @@ def visualize_dist_trajectory(
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Visualize distance trajectory")
+    parser = argparse.ArgumentParser(
+        description="Visualize distance trajectory"
+    )
     parser.add_argument("trj", type=Path, help="Trajectory file (.gro)")
     parser.add_argument("num", type=int, help="Molecule index")
-    parser.add_argument("--traps", type=Path, help="Traps pickle file (optional)")
+    parser.add_argument(
+        "--traps", type=Path, help="Traps pickle file (optional)"
+    )
     args = parser.parse_args()
 
     traps_path = str(args.traps) if args.traps else ""

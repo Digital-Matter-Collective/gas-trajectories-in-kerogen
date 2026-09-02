@@ -54,7 +54,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Build distance maps for extracted structure pickle files."
     )
-    parser.add_argument("structures_dir", type=Path, help="Input structures dir")
+    parser.add_argument(
+        "structures_dir", type=Path, help="Input structures dir"
+    )
     parser.add_argument("output_dir", type=Path, help="Output base directory")
     parser.add_argument(
         "--index",

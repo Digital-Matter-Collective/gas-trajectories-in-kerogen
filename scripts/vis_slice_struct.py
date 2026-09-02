@@ -1,19 +1,12 @@
 import argparse
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
-import os
-
-from itertools import repeat
-
-from pathlib import Path
 import re
-import time
+from pathlib import Path
 from typing import Optional
 
-from matplotlib.colors import BoundaryNorm, ListedColormap
-from matplotlib import pyplot as plt
 import numpy as np
-from base.trajectory import Trajectory
+from matplotlib import pyplot as plt
+from matplotlib.colors import BoundaryNorm, ListedColormap
+
 from utils.utils import kprint
 
 
@@ -35,13 +28,6 @@ def plot_kerogen_struct_slice(
         kprint("No match")
         return
     data = match.groupdict()
-    num = data["step"]
-    x_min = data["x_min"]
-    x_max = data["x_max"]
-    y_min = data["y_min"]
-    y_max = data["y_max"]
-    z_min = data["z_min"]
-    z_max = data["z_max"]
     resolution = float(data["resolution"])
 
     img = np.load(file_path, mmap_mode="r")

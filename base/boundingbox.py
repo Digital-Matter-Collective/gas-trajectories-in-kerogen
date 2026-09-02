@@ -1,23 +1,22 @@
-from typing import List, Optional, Tuple
-from utils.types import NPBArray, NumberLike, f64
+from typing import List, Optional, Tuple, cast
+
 import numpy as np
 import numpy.typing as npt
 from scipy.spatial.distance import cdist
 
-
-from typing import cast
+from utils.types import NPBArray, NumberLike, f64
 
 
 class Range(object):
     def __init__(
         self,
-        mmin: float = None,
-        mmax: float = None,
+        mmin: Optional[float] = None,
+        mmax: Optional[float] = None,
     ):
         if mmin is not None and mmax is not None:
             assert mmin <= mmax
-        self.min_ = float(np.finfo(float).max) if mmin == None else mmin
-        self.max_ = float(np.finfo(float).min) if mmax == None else mmax
+        self.min_ = float(np.finfo(float).max) if mmin is None else mmin
+        self.max_ = float(np.finfo(float).min) if mmax is None else mmax
 
     def __str__(self) -> str:
         return f"Range(min={self.min_:.3f}_max={self.max_:.3f})"
@@ -67,9 +66,12 @@ class BoundingBox(object):
         y: float | f64 | np.ndarray,
         z: float | f64 | np.ndarray,
     ) -> bool | np.ndarray:
-        return np.logical_and(
-            np.logical_and(self.xb_.inside(x), self.yb_.inside(y)),
-            self.zb_.inside(z),
+        return cast(
+            bool | np.ndarray,
+            np.logical_and(
+                np.logical_and(self.xb_.inside(x), self.yb_.inside(y)),
+                self.zb_.inside(z),
+            ),
         )
 
     def inside_pos(
@@ -77,7 +79,7 @@ class BoundingBox(object):
         pos: np.ndarray,
     ) -> bool:
         assert pos.shape[0] == 3
-        return self.inside(pos[0], pos[1], pos[2])
+        return bool(self.inside(pos[0], pos[1], pos[2]))
 
     def __str__(self) -> str:
         return f"BoundingBox(x={self.xb_}|y={self.yb_}|z={self.zb_})"
@@ -99,7 +101,7 @@ class BoundingBox(object):
 
     def update(self, p: npt.NDArray[np.float32]) -> None:
         for b, v in zip([self.xb_, self.yb_, self.zb_], p.flat):
-            b.update(v)
+            b.update(float(v))
 
     def update_by_box(self, bbox: 'BoundingBox') -> None:
         for nb, b in [

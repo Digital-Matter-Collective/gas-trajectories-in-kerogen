@@ -2,7 +2,7 @@ import argparse
 import sys
 from os.path import isfile, realpath
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,7 +13,7 @@ path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.trajectory import Trajectory
+from base.trajectory import Trajectory  # noqa: E402
 
 
 def smooth(x, window_len=11, window='hanning'):
@@ -57,7 +57,7 @@ def smooth(x, window_len=11, window='hanning'):
     if window_len < 3:
         return x
 
-    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+    if window not in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
         raise ValueError(
             "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'"
         )
@@ -82,9 +82,9 @@ def runClear(
     else:
         trajectories = Trajectory.read_trajectoryes(traj_path)
         trajectories = trajectories[::step]
-        nums = []
-        a_dr2 = []
-        a_t = []
+        nums: List[int] = []
+        a_dr2: List[float] = []
+        a_t: List[float] = []
         for i, trj in enumerate(trajectories):
             dr2 = trj.msd()
             t = trj.times
@@ -109,7 +109,7 @@ def runSmooth(traj_path: str, prefix: str) -> None:
         dr2, t = trj.msd()
         msd += dr2
 
-    print(f"Time window size", t[wl] - t[0])
+    print("Time window size", t[wl] - t[0])
     msd /= len(trajectories)
 
     msd = smooth(msd, 20, 'flat')
@@ -137,9 +137,9 @@ def runTimeAvarage(
     else:
         trajectories = Trajectory.read_trajectoryes(traj_path)
 
-        nums = []
-        a_msd = []
-        a_t = []
+        nums: List[int] = []
+        a_msd: List[float] = []
+        a_t: List[float] = []
         for i, trj in enumerate(trajectories[::step]):
             msd = trj.msd_average_time()
             t = trj.times
@@ -158,11 +158,15 @@ def runTimeAvarage(
 def _parse_trj(s: str) -> Tuple[str, str, int]:
     parts = s.split(":", 2)
     if len(parts) != 3:
-        raise argparse.ArgumentTypeError(f"Expected PATH:LABEL:STEP, got: {s!r}")
+        raise argparse.ArgumentTypeError(
+            f"Expected PATH:LABEL:STEP, got: {s!r}"
+        )
     try:
         step = int(parts[2])
     except ValueError:
-        raise argparse.ArgumentTypeError(f"STEP must be an integer, got: {parts[2]!r}")
+        raise argparse.ArgumentTypeError(
+            f"STEP must be an integer, got: {parts[2]!r}"
+        )
     return parts[0], parts[1], step
 
 

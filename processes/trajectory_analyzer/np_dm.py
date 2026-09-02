@@ -1,8 +1,5 @@
 from dataclasses import dataclass
-from functools import cached_property
-from typing import Optional, Tuple
-import numpy as np
-
+from typing import Optional
 
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
@@ -13,9 +10,7 @@ from processes.trajectory_analyzer.np import (
     NeymanPearsonAnalyzer,
 )
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-
-from utils.utils import pdistances
-from utils.types import NPFArray, NPBArray, i32
+from utils.types import NPBArray
 
 
 @dataclass

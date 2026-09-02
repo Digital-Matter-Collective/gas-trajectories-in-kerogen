@@ -1,18 +1,17 @@
 from dataclasses import dataclass
-from functools import cached_property
-from typing import Optional, Tuple
-import numpy as np
+from typing import Optional
 
+import numpy as np
 
 from base.trajectory import Trajectory
 from processes.distribution_fitter import (
     GammaFitter,
+    PdfFitter,
     WeibullFitter,
 )
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-
+from utils.types import NPBArray, NPFArray
 from utils.utils import pdistances
-from utils.types import NPFArray, NPBArray, i32
 
 
 @dataclass
@@ -57,8 +56,8 @@ class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
     @staticmethod
     def analyze(
         trj: Trajectory,
-        transition_step_fitter: WeibullFitter | GammaFitter,
-        trapped_step_fitter: GammaFitter | WeibullFitter,
+        transition_step_fitter: PdfFitter,
+        trapped_step_fitter: PdfFitter,
     ) -> NPFArray:
         NeymanPearsonAnalyzer.validate_trajectory(trj)
         points = trj.points_without_periodic
@@ -81,7 +80,9 @@ class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
         return np.divide(L_C, L_T).astype(np.float64)
 
     @staticmethod
-    def calculate_threshold(f_distr, g_distr, epsilon, x_max: float = 1.0) -> float:
+    def calculate_threshold(
+        f_distr, g_distr, epsilon, x_max: float = 1.0
+    ) -> float:
         x = np.linspace(0, x_max, 1_000_000)
         f = f_distr.pdf(x)
         g = g_distr.pdf(x)

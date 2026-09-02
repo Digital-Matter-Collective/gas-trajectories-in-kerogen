@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from pathlib import Path
 import argparse
+from pathlib import Path
 
 from utils.gro_trajectory import filter_trajectory as filter_gro_trajectory
 
@@ -16,9 +16,9 @@ def parse_selection(value: str):
         H2:10
     """
     try:
-        gas, num = value.split(":")
+        gas, num_str = value.split(":")
         gas = gas.strip()
-        num = int(num.strip())
+        num = int(num_str.strip())
     except ValueError:
         raise argparse.ArgumentTypeError(
             f"Invalid selection '{value}'. Expected format GAS:NUM, for example KRG:99"

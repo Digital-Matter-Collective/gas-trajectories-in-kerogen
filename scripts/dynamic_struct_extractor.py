@@ -95,7 +95,9 @@ def main() -> None:
         description="Extract selected structures from a .gro trajectory into pickle files."
     )
     parser.add_argument("input", type=Path, help="Input .gro trajectory file")
-    parser.add_argument("output_dir", type=Path, help="Directory for structures")
+    parser.add_argument(
+        "output_dir", type=Path, help="Directory for structures"
+    )
     parser.add_argument(
         "--index",
         action="append",

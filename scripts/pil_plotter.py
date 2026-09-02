@@ -1,20 +1,19 @@
 import argparse
 import json
 import pickle
-import sys
-from os.path import isfile, join, realpath
+from os.path import isfile, join
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import PowerNorm
+from matplotlib.ticker import MaxNLocator
 from scipy.stats import exponweib
 
 from processes.distribution_fitter import GammaFitter
-from utils.utils import kprint
-from matplotlib.colors import PowerNorm
-from matplotlib.ticker import MaxNLocator
-
 from processes.pil_distr_generator import PiLDistrGenerator
+from utils.utils import kprint
 
 
 def _centers_to_edges(values: np.ndarray) -> np.ndarray:
@@ -152,7 +151,7 @@ def plot_distributions(
 
     # --- upper panel in the same axes: heatmap Π(l|r), y >= 0 ---
     # cmap = plt.colormaps["magma"].copy()
-    cmap = plt.cm.YlOrRd.copy()
+    cmap = plt.colormaps["YlOrRd"].copy()
     cmap.set_bad(alpha=0)
 
     norm = PowerNorm(
@@ -162,6 +161,7 @@ def plot_distributions(
         clip=True,
     )
 
+    mesh: ScalarMappable
     if heatmap_mode == "mesh":
         mesh = ax.pcolormesh(
             sample_rad,
@@ -214,7 +214,6 @@ def plot_distributions(
     ax.axhline(0.0, color="black", linewidth=1.2)
     y_tick_text = -0.025 * float(l_vals.max())  # чуть ниже линии y=0
     tick_len = 0.01 * float(l_vals.max())
-    x_center = 0.5 * (float(sample_rad.min()) + float(sample_rad.max()))
     y_xlabel = -0.10 * float(l_vals.max())
 
     # --- limits ---
@@ -298,22 +297,28 @@ def plot_distributions(
     )
 
     # --- colorbar ---
-    cax = ax.inset_axes([
+    cax = ax.inset_axes(
+        (
             0.10,  # отступ слева, доля ширины графика
             0.90,  # положение снизу
             0.80,  # ширина
-            0.035, # высота
-        ], zorder=10
+            0.035,  # высота
+        ),
+        zorder=10,
     )
     cbar = fig.colorbar(mesh, cax=cax, orientation="horizontal")
-    
-    cbar.set_label(r"$\Pi(l \mid r)$", fontsize=20, labelpad=10,)
+
+    cbar.set_label(
+        r"$\Pi(l \mid r)$",
+        fontsize=20,
+        labelpad=10,
+    )
     cbar.ax.xaxis.set_ticks_position("top")
     cbar.ax.xaxis.set_label_position("top")
     cbar.ax.xaxis.set_major_locator(MaxNLocator(nbins=5, integer=True))
     cbar.locator = MaxNLocator(nbins=4)
     cbar.update_ticks()
-    cbar.ax.tick_params(axis="x", labelsize=14, pad=1)   
+    cbar.ax.tick_params(axis="x", labelsize=14, pad=1)
 
     fig.savefig(
         join(path_to_save, "figs", "pilr_2d.svg"),

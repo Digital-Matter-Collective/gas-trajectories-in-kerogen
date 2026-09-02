@@ -21,37 +21,36 @@ import os
 import pickle
 import re
 import warnings
-from dataclasses import dataclass, field
 from os.path import join
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
-from matplotlib.gridspec import GridSpec
 import numpy as np
 import numpy.typing as npt
+from matplotlib.gridspec import GridSpec
 
 from base.trap_sequence import TrapSequence
 from processes.powerlaw_fitter import (
-    FitResult,
     MIN_TAIL_SIZE,
+    FitResult,
+    _plc_normalization,
     exp_ccdf,
     exp_loglik,
+    find_xmin_optimal,
     fit_exponential,
     fit_plc,
     fit_powerlaw,
-    find_xmin_optimal,
     ks_statistic,
-    mc_pvalue_pl,
     mc_pvalue_exp,
+    mc_pvalue_pl,
     mc_pvalue_plc,
     pl_ccdf,
     pl_loglik,
     plc_ccdf_grid,
     plc_loglik,
     vuong_test,
-    _plc_normalization,
 )
 from utils.utils import kprint
 
@@ -238,7 +237,7 @@ def run_xmin_mode(
     )
 
     results: List[FitResult] = []
-    r_pl = _fit_all_at_xmin(x, 9.000000000000001e-09, n_synth, rng, compute_mc=True)
+    _fit_all_at_xmin(x, 9.000000000000001e-09, n_synth, rng, compute_mc=True)
     for i, xm in enumerate(xmin_grid):
         r = _fit_all_at_xmin(x, xm, n_synth, rng, compute_mc=True)
         if r is not None:
@@ -331,30 +330,34 @@ def plot_xmin_analysis(
         return
 
     # ---- Build arrays ----
-    xmins_arr     = np.array([r.xmin        for r in results])
-    d_pl_arr      = np.array([r.D_pl        for r in results])
-    d_exp_arr     = np.array([r.D_exp       for r in results])
-    d_plc_arr     = np.array([r.D_plc       for r in results])
-    p_mc_pl_arr   = np.array([r.p_mc_pl     for r in results])
-    p_mc_exp_arr  = np.array([r.p_mc_exp    for r in results])
-    p_mc_plc_arr  = np.array([r.p_mc_plc    for r in results])
-    alpha_arr     = np.array([r.alpha       for r in results])
+    xmins_arr = np.array([r.xmin for r in results])
+    d_pl_arr = np.array([r.D_pl for r in results])
+    d_exp_arr = np.array([r.D_exp for r in results])
+    d_plc_arr = np.array([r.D_plc for r in results])
+    p_mc_pl_arr = np.array([r.p_mc_pl for r in results])
+    p_mc_exp_arr = np.array([r.p_mc_exp for r in results])
+    p_mc_plc_arr = np.array([r.p_mc_plc for r in results])
+    alpha_arr = np.array([r.alpha for r in results])
     alpha_sig_arr = np.array([r.alpha_sigma for r in results])
-    lam_arr       = np.array([r.lam_exp     for r in results])
-    ntail_arr     = np.array([r.n_tail      for r in results], dtype=float)
-    alpha_plc_arr = np.array([r.alpha_plc   for r in results])
-    lam_plc_arr   = np.array([r.lam_plc     for r in results])
+    lam_arr = np.array([r.lam_exp for r in results])
+    ntail_arr = np.array([r.n_tail for r in results], dtype=float)
+    alpha_plc_arr = np.array([r.alpha_plc for r in results])
+    lam_plc_arr = np.array([r.lam_plc for r in results])
 
     # ---- Per-law optimal xmin ----
-    idx_pl  = int(np.argmin(d_pl_arr))
-    idx_exp = int(np.argmin(np.where(np.isfinite(d_exp_arr), d_exp_arr, np.inf)))
-    idx_plc = int(np.argmin(np.where(np.isfinite(d_plc_arr), d_plc_arr, np.inf)))
+    idx_pl = int(np.argmin(d_pl_arr))
+    idx_exp = int(
+        np.argmin(np.where(np.isfinite(d_exp_arr), d_exp_arr, np.inf))
+    )
+    idx_plc = int(
+        np.argmin(np.where(np.isfinite(d_plc_arr), d_plc_arr, np.inf))
+    )
 
-    xmin_opt_pl  = xmins_arr[idx_pl]
+    xmin_opt_pl = xmins_arr[idx_pl]
     xmin_opt_exp = xmins_arr[idx_exp]
     xmin_opt_plc = xmins_arr[idx_plc]
 
-    res_pl  = results[idx_pl]
+    res_pl = results[idx_pl]
     res_exp = results[idx_exp]
     res_plc = results[idx_plc]
 
@@ -366,44 +369,71 @@ def plot_xmin_analysis(
     # ---- Layout: 4 rows × 2 columns ----
     fig = plt.figure(figsize=(14, 20))
     gs = GridSpec(
-        4, 2,
+        4,
+        2,
         figure=fig,
         hspace=0.50,
         wspace=0.38,
         height_ratios=[1.0, 1.2, 1.2, 1.2],
     )
 
-    ax_ks  = fig.add_subplot(gs[0, 0])
-    ax_pv  = fig.add_subplot(gs[0, 1])
-    ax_pl  = fig.add_subplot(gs[1, 0])
+    ax_ks = fig.add_subplot(gs[0, 0])
+    ax_pv = fig.add_subplot(gs[0, 1])
+    ax_pl = fig.add_subplot(gs[1, 0])
     ax_hal = fig.add_subplot(gs[1, 1])
-    ax_ex  = fig.add_subplot(gs[2, 0])
+    ax_ex = fig.add_subplot(gs[2, 0])
     ax_hlm = fig.add_subplot(gs[2, 1])
-    ax_pc  = fig.add_subplot(gs[3, 0])
-    ax_hm  = fig.add_subplot(gs[3, 1])
+    ax_pc = fig.add_subplot(gs[3, 0])
+    ax_hm = fig.add_subplot(gs[3, 1])
 
     # ---- Shared helper: per-law vertical markers ----
-    _sup = {'pl': r'\mathrm{pl}', 'exp': r'\mathrm{exp}', 'plc': r'\mathrm{plc}'}
+    _sup = {
+        'pl': r'\mathrm{pl}',
+        'exp': r'\mathrm{exp}',
+        'plc': r'\mathrm{plc}',
+    }
     _opt_xmins = [
-        (xmin_opt_pl, 'pl'), (xmin_opt_exp, 'exp'), (xmin_opt_plc, 'plc')
+        (xmin_opt_pl, 'pl'),
+        (xmin_opt_exp, 'exp'),
+        (xmin_opt_plc, 'plc'),
     ]
 
     # ================================================================
     # [0,0] KS vs x_min
     # ================================================================
-    ax_ks.plot(xmins_arr, d_pl_arr, color=_COLORS['pl'],
-               label=_LABELS['pl'], linewidth=2)
+    ax_ks.plot(
+        xmins_arr,
+        d_pl_arr,
+        color=_COLORS['pl'],
+        label=_LABELS['pl'],
+        linewidth=2,
+    )
     mask_e = np.isfinite(d_exp_arr)
     if mask_e.any():
-        ax_ks.plot(xmins_arr[mask_e], d_exp_arr[mask_e],
-                   color=_COLORS['exp'], label=_LABELS['exp'], linewidth=2)
+        ax_ks.plot(
+            xmins_arr[mask_e],
+            d_exp_arr[mask_e],
+            color=_COLORS['exp'],
+            label=_LABELS['exp'],
+            linewidth=2,
+        )
     mask_p = np.isfinite(d_plc_arr)
     if mask_p.any():
-        ax_ks.plot(xmins_arr[mask_p], d_plc_arr[mask_p],
-                   color=_COLORS['plc'], label=_LABELS['plc'], linewidth=2)
+        ax_ks.plot(
+            xmins_arr[mask_p],
+            d_plc_arr[mask_p],
+            color=_COLORS['plc'],
+            label=_LABELS['plc'],
+            linewidth=2,
+        )
     for xm, key in _opt_xmins:
-        ax_ks.axvline(xm, color=_COLORS[key], linestyle='--', linewidth=1.2,
-                      label=rf'$x_{{\min}}^{{{_sup[key]}}}={xm:.2e}$')
+        ax_ks.axvline(
+            xm,
+            color=_COLORS[key],
+            linestyle='--',
+            linewidth=1.2,
+            label=rf'$x_{{\min}}^{{{_sup[key]}}}={xm:.2e}$',
+        )
     _log_axis(ax_ks)
     ax_ks.set_xlabel(r'$x_{\min}\ (\mathrm{s})$', fontsize=12)
     ax_ks.set_ylabel('KS statistic $D$', fontsize=12)
@@ -419,7 +449,7 @@ def plot_xmin_analysis(
         if m.any():
             ax.plot(xmins_arr[m], arr[m], color=color, linewidth=2, label=label)
 
-    _pv_line(ax_pv, p_mc_pl_arr,  _COLORS['pl'],  'MC p-val (PL)')
+    _pv_line(ax_pv, p_mc_pl_arr, _COLORS['pl'], 'MC p-val (PL)')
     _pv_line(ax_pv, p_mc_exp_arr, _COLORS['exp'], 'MC p-val (Exp)')
     _pv_line(ax_pv, p_mc_plc_arr, _COLORS['plc'], 'MC p-val (PLC)')
 
@@ -428,13 +458,25 @@ def plot_xmin_analysis(
     all_pv = np.concatenate([p_mc_pl_arr, p_mc_exp_arr, p_mc_plc_arr])
     ymax_pv = (
         max(float(np.nanmax(all_pv[np.isfinite(all_pv)])) * 1.1, 0.25)
-        if np.any(np.isfinite(all_pv)) else 1.0
+        if np.any(np.isfinite(all_pv))
+        else 1.0
     )
-    ax_pv.fill_between(xmins_arr, 0.1, ymax_pv, color='green', alpha=0.08,
-                        label='plausible ($p>0.1$)')
+    ax_pv.fill_between(
+        xmins_arr,
+        0.1,
+        ymax_pv,
+        color='green',
+        alpha=0.08,
+        label='plausible ($p>0.1$)',
+    )
     for xm, key in _opt_xmins:
-        ax_pv.axvline(xm, color=_COLORS[key], linestyle='--', linewidth=1.2,
-                      label=rf'$x_{{\min}}^{{{_sup[key]}}}$')
+        ax_pv.axvline(
+            xm,
+            color=_COLORS[key],
+            linestyle='--',
+            linewidth=1.2,
+            label=rf'$x_{{\min}}^{{{_sup[key]}}}$',
+        )
     _log_axis(ax_pv)
     ax_pv.set_ylim(0.0, min(ymax_pv, 1.05))
     ax_pv.set_xlabel(r'$x_{\min}\ (\mathrm{s})$', fontsize=12)
@@ -447,12 +489,28 @@ def plot_xmin_analysis(
     # [1,1] Hill plot — α (power law)
     # ================================================================
     err_al = 1.96 * alpha_sig_arr
-    ax_hal.plot(xmins_arr, alpha_arr, color=_COLORS['pl'], linewidth=2,
-                label=r'$\hat{\alpha}$')
-    ax_hal.fill_between(xmins_arr, alpha_arr - err_al, alpha_arr + err_al,
-                        color=_COLORS['pl'], alpha=0.20, label=r'$95\%$ CI')
-    ax_hal.axvline(xmin_opt_pl, color=_COLORS['pl'], linestyle='--', linewidth=1.2,
-                   label=rf'$x_{{\min}}^{{\mathrm{{pl}}}}={xmin_opt_pl:.2e}$')
+    ax_hal.plot(
+        xmins_arr,
+        alpha_arr,
+        color=_COLORS['pl'],
+        linewidth=2,
+        label=r'$\hat{\alpha}$',
+    )
+    ax_hal.fill_between(
+        xmins_arr,
+        alpha_arr - err_al,
+        alpha_arr + err_al,
+        color=_COLORS['pl'],
+        alpha=0.20,
+        label=r'$95\%$ CI',
+    )
+    ax_hal.axvline(
+        xmin_opt_pl,
+        color=_COLORS['pl'],
+        linestyle='--',
+        linewidth=1.2,
+        label=rf'$x_{{\min}}^{{\mathrm{{pl}}}}={xmin_opt_pl:.2e}$',
+    )
     _log_axis(ax_hal)
     ax_hal.set_xlabel(r'$x_{\min}\ (\mathrm{s})$', fontsize=12)
     ax_hal.set_ylabel(r'$\hat{\alpha}$', fontsize=12)
@@ -465,16 +523,32 @@ def plot_xmin_analysis(
     # ================================================================
     mask_lam = np.isfinite(lam_arr) & (lam_arr > 0) & (ntail_arr > 0)
     if mask_lam.any():
-        lam_m   = lam_arr[mask_lam]
+        lam_m = lam_arr[mask_lam]
         xmins_m = xmins_arr[mask_lam]
         ntail_m = ntail_arr[mask_lam]
-        err_lm  = 1.96 * lam_m / np.sqrt(ntail_m)
-        ax_hlm.plot(xmins_m, lam_m, color=_COLORS['exp'], linewidth=2,
-                    label=r'$\hat{\lambda}$')
-        ax_hlm.fill_between(xmins_m, lam_m - err_lm, lam_m + err_lm,
-                            color=_COLORS['exp'], alpha=0.20, label=r'$95\%$ CI')
-    ax_hlm.axvline(xmin_opt_exp, color=_COLORS['exp'], linestyle='--', linewidth=1.2,
-                   label=rf'$x_{{\min}}^{{\mathrm{{exp}}}}={xmin_opt_exp:.2e}$')
+        err_lm = 1.96 * lam_m / np.sqrt(ntail_m)
+        ax_hlm.plot(
+            xmins_m,
+            lam_m,
+            color=_COLORS['exp'],
+            linewidth=2,
+            label=r'$\hat{\lambda}$',
+        )
+        ax_hlm.fill_between(
+            xmins_m,
+            lam_m - err_lm,
+            lam_m + err_lm,
+            color=_COLORS['exp'],
+            alpha=0.20,
+            label=r'$95\%$ CI',
+        )
+    ax_hlm.axvline(
+        xmin_opt_exp,
+        color=_COLORS['exp'],
+        linestyle='--',
+        linewidth=1.2,
+        label=rf'$x_{{\min}}^{{\mathrm{{exp}}}}={xmin_opt_exp:.2e}$',
+    )
     _log_axis(ax_hlm)
     ax_hlm.set_xlabel(r'$x_{\min}\ (\mathrm{s})$', fontsize=12)
     ax_hlm.set_ylabel(r'$\hat{\lambda}\ (\mathrm{s}^{-1})$', fontsize=12)
@@ -485,40 +559,74 @@ def plot_xmin_analysis(
     # ================================================================
     # Distribution fit panels helper
     # ================================================================
-    n_total  = len(x)
-    n_bins   = 50
+    n_total = len(x)
+    n_bins = 50
     bins_all = np.logspace(np.log10(x.min()), np.log10(x.max()), n_bins + 1)
     counts_all, edges_all = np.histogram(x, bins=bins_all, density=True)
     widths_all = np.diff(edges_all)
     pos_mask = counts_all > 0
 
     def _fit_panel(ax, r, method, color, title):
-        xm     = r.xmin
+        xm = r.xmin
         f_tail = np.sum(x >= xm) / n_total
         x_plot = np.logspace(np.log10(xm), np.log10(x.max()), 500)
-        ax.bar(edges_all[:-1][pos_mask], counts_all[pos_mask],
-               width=widths_all[pos_mask], align='edge',
-               color='steelblue', alpha=0.4, label='all data', zorder=1)
+        ax.bar(
+            edges_all[:-1][pos_mask],
+            counts_all[pos_mask],
+            width=widths_all[pos_mask],
+            align='edge',
+            color='steelblue',
+            alpha=0.4,
+            label='all data',
+            zorder=1,
+        )
         if method == 'pl' and np.isfinite(r.alpha) and r.alpha > 1.0:
             pdf = f_tail * (r.alpha - 1.0) / xm * (x_plot / xm) ** (-r.alpha)
-            ax.plot(x_plot, pdf, color=color, linewidth=2,
-                    label=rf'PL $\alpha={r.alpha:.2f}$', zorder=2)
+            ax.plot(
+                x_plot,
+                pdf,
+                color=color,
+                linewidth=2,
+                label=rf'PL $\alpha={r.alpha:.2f}$',
+                zorder=2,
+            )
         elif method == 'exp' and np.isfinite(r.lam_exp) and r.lam_exp > 0.0:
             pdf = f_tail * r.lam_exp * np.exp(-r.lam_exp * (x_plot - xm))
-            ax.plot(x_plot, pdf, color=color, linewidth=2,
-                    label=rf'Exp $\lambda={r.lam_exp:.2e}$', zorder=2)
-        elif (method == 'plc' and np.isfinite(r.alpha_plc) and r.alpha_plc > 1.0
-              and np.isfinite(r.lam_plc) and r.lam_plc >= 0.0):
+            ax.plot(
+                x_plot,
+                pdf,
+                color=color,
+                linewidth=2,
+                label=rf'Exp $\lambda={r.lam_exp:.2e}$',
+                zorder=2,
+            )
+        elif (
+            method == 'plc'
+            and np.isfinite(r.alpha_plc)
+            and r.alpha_plc > 1.0
+            and np.isfinite(r.lam_plc)
+            and r.lam_plc >= 0.0
+        ):
             C = _plc_normalization(r.alpha_plc, r.lam_plc, xm)
             if C > 0.0:
                 with np.errstate(over='ignore', under='ignore'):
-                    pdf_raw = (x_plot ** (-r.alpha_plc)
-                               * np.exp(-r.lam_plc * x_plot) / C)
+                    pdf_raw = (
+                        x_plot ** (-r.alpha_plc)
+                        * np.exp(-r.lam_plc * x_plot)
+                        / C
+                    )
                 pdf_raw = np.where(np.isfinite(pdf_raw), pdf_raw, np.nan)
-                ax.plot(x_plot, f_tail * pdf_raw, color=color, linewidth=2,
-                        zorder=2,
-                        label=(rf'PLC $\alpha={r.alpha_plc:.2f}$,'
-                               rf' $\lambda={r.lam_plc:.2e}$'))
+                ax.plot(
+                    x_plot,
+                    f_tail * pdf_raw,
+                    color=color,
+                    linewidth=2,
+                    zorder=2,
+                    label=(
+                        rf'PLC $\alpha={r.alpha_plc:.2f}$,'
+                        rf' $\lambda={r.lam_plc:.2e}$'
+                    ),
+                )
         ax.axvline(xm, color='grey', linestyle='--', linewidth=1.2, alpha=0.8)
         ax.set_xscale('log')
         ax.set_yscale('log')
@@ -529,7 +637,7 @@ def plot_xmin_analysis(
         ax.set_title(title, fontsize=11)
 
     # [1,0] PL fit
-    _fit_panel(ax_pl, res_pl,  'pl',  _COLORS['pl'],  'Power-Law Fit')
+    _fit_panel(ax_pl, res_pl, 'pl', _COLORS['pl'], 'Power-Law Fit')
     # [2,0] Exp fit
     _fit_panel(ax_ex, res_exp, 'exp', _COLORS['exp'], 'Exponential Fit')
     # [3,0] PLC fit
@@ -538,23 +646,36 @@ def plot_xmin_analysis(
     # ================================================================
     # [3,1] PLC heatmap — (alpha_plc, lam_plc) coloured by D_plc
     # ================================================================
-    mask_hm = (np.isfinite(alpha_plc_arr) & np.isfinite(lam_plc_arr)
-               & np.isfinite(d_plc_arr))
+    mask_hm = (
+        np.isfinite(alpha_plc_arr)
+        & np.isfinite(lam_plc_arr)
+        & np.isfinite(d_plc_arr)
+    )
     if mask_hm.any():
         sc = ax_hm.scatter(
-            alpha_plc_arr[mask_hm], lam_plc_arr[mask_hm],
-            c=d_plc_arr[mask_hm], cmap='viridis_r',
-            s=25, alpha=0.85, zorder=2,
+            alpha_plc_arr[mask_hm],
+            lam_plc_arr[mask_hm],
+            c=d_plc_arr[mask_hm],
+            cmap='viridis_r',
+            s=25,
+            alpha=0.85,
+            zorder=2,
         )
         fig.colorbar(sc, ax=ax_hm, label='KS statistic $D$')
         if np.isfinite(res_plc.alpha_plc) and np.isfinite(res_plc.lam_plc):
             ax_hm.scatter(
-                [res_plc.alpha_plc], [res_plc.lam_plc],
-                marker='*', s=200, color='red', zorder=5,
-                label=rf'$x_{{\min}}^{{\mathrm{{plc}}}}$ optimum',
+                [res_plc.alpha_plc],
+                [res_plc.lam_plc],
+                marker='*',
+                s=200,
+                color='red',
+                zorder=5,
+                label=r'$x_{\min}^{\mathrm{plc}}$ optimum',
             )
     ax_hm.set_xlabel(r'$\alpha_{\mathrm{plc}}$', fontsize=12)
-    ax_hm.set_ylabel(r'$\lambda_{\mathrm{plc}}\ (\mathrm{s}^{-1})$', fontsize=12)
+    ax_hm.set_ylabel(
+        r'$\lambda_{\mathrm{plc}}\ (\mathrm{s}^{-1})$', fontsize=12
+    )
     ax_hm.legend(frameon=False, fontsize=9)
     ax_hm.tick_params(labelsize=9)
     ax_hm.set_title('PLC Parameter Space — KS Dispersion', fontsize=11)

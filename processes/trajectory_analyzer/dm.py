@@ -1,23 +1,17 @@
 import pickle
-from abc import abstractmethod
 from dataclasses import dataclass, field
-from functools import cached_property
 from importlib import resources
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple, cast
 
 import numpy as np
 import numpy.typing as npt
-from joblib import Parallel, delayed
 from numba import njit
 from scipy import ndimage
-from scipy.signal import convolve2d
 from skimage import measure
-
-from utils.types import NPFArray, NPIArray, NPBArray, f32
 
 from base.trajectory import Trajectory
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
-
+from utils.types import NPBArray, NPFArray, NPIArray, f32
 
 _THRESHOLD_PACKAGE = "list_threshold"
 
@@ -80,9 +74,7 @@ class DistanceMatrixParams:
         Used to normalize the distance matrix. (lambda in article)
         and by default affects the number of filled diagonals in the distance matrix
     """
-    list_mu: npt.NDArray[f32] = field(
-        default_factory=lambda: np.array([1, 1.5, 2])
-    )
+    list_mu: NPFArray = field(default_factory=lambda: np.array([1, 1.5, 2]))
 
     """ can be any percentile (minimum 0.01)
         from 0 to 1
@@ -112,10 +104,12 @@ class DistanceMatrixParams:
     @staticmethod
     def get_params(
         indexes: Optional[List[int]] = None,
-        lmu: Optional[List[int]] = None,
+        lmu: Optional[Sequence[float]] = None,
     ) -> List['DistanceMatrixParams']:
         list_mu = (
-            np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0]) if lmu is None else lmu
+            np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+            if lmu is None
+            else np.asarray(lmu)
         )
         atparams = DistanceMatrixParams.all_params()
         if indexes is not None:
@@ -181,7 +175,7 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         points = trj.points_without_periodic
         sq_dist_matrix = self.compute_pairwise_sq_dist(points)
 
-        def analyse(mu: float) -> Tuple[bool, npt.NDArray[np.bool_]]:
+        def analyse(mu: float) -> Tuple[bool, NPFArray, NPBArray]:
             return self.analyse_by_mu(
                 sq_dist_matrix,
                 self.params.p_value,
@@ -273,7 +267,7 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
 
         # Векторизованная матрица ||x_i - x_j||^2:
         # D2 = ||x||^2[:,None] + ||x||^2[None,:] - 2 X X^T
-        x2 = np.sum(X * X, axis=1, dtype=f32)  # (N,)
+        x2 = cast(NPFArray, np.sum(X * X, axis=1, dtype=f32))  # (N,)
         G = X @ X.T  # (N,N) float32
         sq_dist_matrix = (x2[:, None] + x2[None, :] - 2.0 * G).astype(f32)
 
@@ -324,7 +318,9 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         )
         return list_vertical, list_diagonal, list_parallel
 
-    def extract_invariants(self, matrix, N) -> Tuple[NPIArray, NPIArray, NPIArray]:  
+    def extract_invariants(
+        self, matrix, N
+    ) -> Tuple[NPIArray, NPIArray, NPIArray]:
         list_diagonal = np.zeros(shape=(N,), dtype=np.int64)
         list_vertical = np.zeros(shape=(N,), dtype=np.int64)
         list_parallel = np.zeros(shape=(N,), dtype=np.int64)
@@ -384,6 +380,7 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         result[:, 1] = [a for _, a in List_min_max]
         return result
 
+    @staticmethod
     def get_up_down(index, n, bin_arr, vert_arr):
         return find_min_max_index(index, bin_arr), find_min_max_index(
             n, vert_arr

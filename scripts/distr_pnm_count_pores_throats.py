@@ -1,25 +1,19 @@
 import argparse
-import json
-import subprocess
 import sys
-import time
 from os import listdir
-from os.path import dirname, isfile, join, realpath
+from os.path import isfile, join, realpath
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import List, Tuple
 
 import matplotlib.pyplot as plt
-import networkx as nx
-import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy.stats import exponweib, weibull_min
 
 path = Path(realpath(__file__))
 parent_dir = str(path.parent.parent.absolute())
 sys.path.append(parent_dir)
 
-from base.reader import Reader
+from base.reader import Reader  # noqa: E402
 
 
 def build_distributions(paths: List[Tuple[str, str]]) -> None:
@@ -42,14 +36,14 @@ def build_distributions(paths: List[Tuple[str, str]]) -> None:
 
         result[hist_prefix] = (count_pores, count_throats)
 
-    cp = []
-    ct = []
-    names = []
+    cp: List[int] = []
+    ct: List[int] = []
+    names: List[str] = []
     for _, hist_prefix in paths:
-        r = result[hist_prefix]
-        names = names + [hist_prefix] * len(r[0])
-        cp = cp + r[0]
-        ct = ct + r[1]
+        cnts = result[hist_prefix]
+        names = names + [hist_prefix] * len(cnts[0])
+        cp = cp + cnts[0]
+        ct = ct + cnts[1]
 
     dcp = pd.DataFrame(
         list(zip(cp, names)),

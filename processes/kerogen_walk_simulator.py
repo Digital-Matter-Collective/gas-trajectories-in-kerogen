@@ -1,24 +1,13 @@
-import argparse
-import os
-import pickle
 import random
-import sys
-from os import listdir
-from os.path import dirname, isfile, join, realpath
-from pathlib import Path
-from typing import List, Tuple
+from typing import Tuple
 
-import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import numpy.typing as npt
-
-from utils.types import NPFArray, NPIArray, NPBArray, f32
-from base.bufferedsampler import BufferedSampler
-from processes.distribution_fitter import WeibullFitter
 
 from base.boundingbox import BoundingBox, Range
+from base.bufferedsampler import BufferedSampler
 from base.trajectory import Trajectory
+from utils.types import NPFArray, f32
 
 
 class Uniform01:
@@ -75,7 +64,7 @@ class KerogenWalkSimulator:
         :param bs_psd: trap size distribution
         :param bs_ps: count steps in trap distribution
         :param bs_ptl: distribution of length steps between traps
-        :param p: probability of moving return to adjacent traps and 1 - p to the next trap 
+        :param p: probability of moving return to adjacent traps and 1 - p to the next trap
         :param k: probability of staying in the current trap (trapping occuared) and 1 - k stepping further
         :return: Nothing
         """
@@ -247,7 +236,7 @@ class KerogenWalkSimulator:
         mmax = points.max(axis=0) + 1e6
         df = mmax - mmin
         bbox = BoundingBox(
-            *tuple(Range(k - f, l + f) for k, l, f in zip(mmin, mmax, df))
+            *tuple(Range(k - f, mx + f) for k, mx, f in zip(mmin, mmax, df))
         )
 
         # print(f"Count move next: {count_move_next}")

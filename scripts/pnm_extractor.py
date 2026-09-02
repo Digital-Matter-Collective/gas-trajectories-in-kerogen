@@ -1,9 +1,8 @@
 import argparse
 import json
-import re
 import subprocess
 from os import listdir
-from os.path import dirname, isfile, join, realpath
+from os.path import isfile, join
 from pathlib import Path
 
 from utils.utils import get_float_img_pattern, kprint
