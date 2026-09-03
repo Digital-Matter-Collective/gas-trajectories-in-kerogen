@@ -560,12 +560,12 @@ Kerogen-molecule correlation function, for one molecule extracted with
 python -m scripts.corrfunc_struct_plotter \
   "$DATA_DIR/bin_images" "$DATA_DIR/ct_pore.npy" "$DATA_DIR/figs/corrfunc.svg" \
   --trj "$CH4_DIR/trj.gro:CH4" --trj "$H2_DIR/trj.gro:H2" \
-  --pore --max-t 2.8
+  --max-t 2.8
 ```
 
 Time-averaged structural autocorrelation C(t) across one or more gas
-trajectories; `--pore` inverts images before computing C(t), `--fit-t-range`
-and `--num-workers` are optional.
+trajectories; images are always inverted before computing C(t). `--max-t`,
+`--x-max` and `--num-workers` are optional.
 
 ```bash
 python -m scripts.distr_pnm_element_size_plotter \

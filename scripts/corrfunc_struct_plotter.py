@@ -10,7 +10,6 @@ from typing import List, cast
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
-from scipy.stats import linregress
 
 from base.trajectory import Trajectory
 from utils.cache_manifest import check_cache, write_manifest
@@ -69,9 +68,7 @@ def plot_corrfunc_and_md(
     C_t,
     trj_msd_list: List[tuple[RMSDResult, str]],
     save_path: Path | None = None,
-    pore_mode: bool = False,
     max_t: float = 2.8,
-    fit_t_range: tuple[float, float] | None = None,
     x_max: float | None = None,
 ) -> None:
     dt = np.asarray(dt, dtype=float)
@@ -102,9 +99,8 @@ def plot_corrfunc_and_md(
 
     lines = line1
     styles = ['-', ':', '--', '-.', '.']
-    _ann_fracs = [0.30, 0.55, 0.75]
     ax2 = ax1.twinx()
-    for curve_idx, (res, prefix) in enumerate(trj_msd_list):
+    for res, prefix in trj_msd_list:
         label = prefix + " " + r"$RMSD(t)$"
 
         r = res.rmsd
@@ -124,39 +120,6 @@ def plot_corrfunc_and_md(
             linestyle=styles.pop(0),
         )
         lines += line
-
-        fit_mask = np.isfinite(t) & np.isfinite(r) & (t > 0) & (r > 0)
-        if fit_t_range is not None:
-            fit_mask &= (t >= fit_t_range[0]) & (t <= fit_t_range[1])
-        if fit_mask.sum() >= 2:
-            slope, intercept, *_ = linregress(
-                np.log(t[fit_mask]), np.log(r[fit_mask])
-            )
-            t_line = np.logspace(
-                np.log10(t[fit_mask].min()), np.log10(t[fit_mask].max()), 200
-            )
-            r_line = np.exp(intercept) * t_line**slope
-
-            count = len(t_line) // 2 - 50
-            t_line = t_line[count:]
-            r_line = r_line[count:]
-
-            ax2.plot(t_line, r_line, '--', linewidth=1.5, color=color_md)
-            frac = _ann_fracs[min(curve_idx, len(_ann_fracs) - 1)]
-            ai = int(frac * (len(t_line) - 1))
-            ax2.annotate(
-                rf"$\sim t^{{{slope:.2f}}}$",
-                xy=(t_line[ai], r_line[ai]),
-                xytext=(20, -40),
-                textcoords="offset points",
-                color=color_md,
-                fontsize=24,
-                ha="center",
-                va="bottom",
-                bbox=dict(
-                    facecolor="white", edgecolor="none", alpha=0.7, pad=1.5
-                ),
-            )
 
     ax2.set_yscale("log")
     ax2.set_xscale("log")
@@ -201,8 +164,6 @@ def correlation_average_time(
     load_img,
     ct_save_path: Path,
     num_workers: int = 4,
-    *,
-    pore_mode: bool = False,
 ):
     """
     Time-averaged autocorrelation function:
@@ -221,7 +182,6 @@ def correlation_average_time(
     cache_metadata = {
         "frame_count": n,
         "image_file_names": sorted(str(f) for f in img_files),
-        "pore_mode": pore_mode,
     }
     status = check_cache(ct_save_path, cache_metadata)
     if status == "match":
@@ -236,8 +196,8 @@ def correlation_average_time(
     else:
         if status == "mismatch":
             kprint(
-                f"Cache {ct_save_path} does not match current images/pore "
-                "mode; recomputing from scratch"
+                f"Cache {ct_save_path} does not match current images; "
+                "recomputing from scratch"
             )
         C_t = np.full(n, np.nan, dtype=np.float64)
         write_manifest(ct_save_path, cache_metadata)
@@ -313,11 +273,6 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--pore",
-        action="store_true",
-        help="Pore mode: invert images (1-img) before computing C(t).",
-    )
-    parser.add_argument(
         "--max-t",
         type=float,
         default=2.8,
@@ -332,13 +287,6 @@ def main() -> None:
         help="Right X-axis display limit in μs (default: auto from data).",
     )
     parser.add_argument(
-        "--fit-t-range",
-        type=float,
-        nargs=2,
-        metavar=("T_MIN", "T_MAX"),
-        help="Time range in μs for power-law regression (default: full range).",
-    )
-    parser.add_argument(
         "--num-workers",
         type=int,
         default=4,
@@ -350,20 +298,21 @@ def main() -> None:
     images_dir: Path = args.images_dir
     ct_file: Path = args.ct_file
     output: Path = args.output
-    pore_mode: bool = args.pore
 
     image_infos = scan_image_infos(images_dir)
     kprint(f"Found {len(image_infos)} image files in {images_dir}")
 
     def load_img(file_name: str) -> np.ndarray:
         img = np.load(file_name, mmap_mode="r")
-        if pore_mode:
-            img = 1 - img
+        img = 1 - img
         return cast(np.ndarray, img.astype(np.int8))
 
     ct_file.parent.mkdir(parents=True, exist_ok=True)
     dt, C_t = correlation_average_time(
-        image_infos, load_img, ct_file, args.num_workers, pore_mode=pore_mode
+        image_infos,
+        load_img,
+        ct_file,
+        args.num_workers,
     )
     kprint(f"C(t) time range: {dt[0]:.4f} … {dt[-1]:.4f} μs")
 
@@ -373,17 +322,13 @@ def main() -> None:
         res = extract_mean_displacement(trajectories)
         trj_msd_list.append((res, label))
 
-    fit_t_range = tuple(args.fit_t_range) if args.fit_t_range else None
-
     output.parent.mkdir(parents=True, exist_ok=True)
     plot_corrfunc_and_md(
         dt=dt,
         C_t=C_t,
         trj_msd_list=trj_msd_list,
         save_path=output,
-        pore_mode=pore_mode,
         max_t=args.max_t,
-        fit_t_range=fit_t_range,
         x_max=args.x_max,
     )
 
