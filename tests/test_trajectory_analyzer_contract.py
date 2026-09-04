@@ -1,3 +1,5 @@
+from typing import Any, Tuple
+
 import numpy as np
 import pytest
 
@@ -53,13 +55,17 @@ def test_dm_scale_shorter_than_its_threshold_returns_a_complete_result() -> (
     assert point_labels.dtype == np.bool_
 
 
-def test_dm_keeps_a_valid_scale_without_short_trapped_runs(monkeypatch) -> None:
+def test_dm_keeps_a_valid_scale_without_short_trapped_runs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     analyzer = object.__new__(DistanceMatrixAnalyzer)
     analyzer.diag_fill_list = [0] * 12
     point_count = 10
     threshold = np.full((12, 100), 2, dtype=np.int32)
 
-    def all_points_form_one_valid_trapped_run(*args, **kwargs):
+    def all_points_form_one_valid_trapped_run(
+        *args: Any, **kwargs: Any
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         del args, kwargs
         return (
             np.full(point_count, 2, dtype=np.int32),

@@ -168,7 +168,7 @@ def fit_plc(
 
     log_x_tail = np.log(x_tail)
 
-    def nll(params: npt.NDArray) -> float:
+    def nll(params: npt.NDArray[np.float64]) -> float:
         alpha, lam = params
         if alpha <= 1.0 + 1e-8 or lam < 0.0:
             return 1e15
@@ -591,8 +591,11 @@ def mc_pvalue_plc(
     cdf_g /= total_g
     ccdf_g = np.clip(1.0 - cdf_g, 0.0, 1.0)
 
-    def _plc_ccdf(t: npt.NDArray) -> npt.NDArray:
-        return cast(npt.NDArray, np.clip(np.interp(t, grid, ccdf_g), 0.0, 1.0))
+    def _plc_ccdf(t: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
+        return cast(
+            npt.NDArray[np.float64],
+            np.clip(np.interp(t, grid, ccdf_g), 0.0, 1.0),
+        )
 
     count_gte = 0
     for _ in range(n_synth):

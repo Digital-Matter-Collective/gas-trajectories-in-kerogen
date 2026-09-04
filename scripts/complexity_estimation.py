@@ -1,13 +1,12 @@
 import argparse
 import json
 import os
-import pickle
 import platform
 import random
 import time
 from os.path import isfile, join
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Dict, List, Protocol, Sequence, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,6 +14,7 @@ import numpy as np
 from base.bufferedsampler import BufferedSampler
 from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
+from processes.distribution_fitter import GammaFitter, WeibullFitter
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
@@ -26,6 +26,7 @@ from processes.trajectory_analyzer.sib import (
     StructureInformedBayesParams,
 )
 from utils.cache_manifest import check_cache, write_manifest
+from utils.logging_setup import setup_logging
 from utils.utils import create_empirical_cdf, kprint, ps_generate
 
 DEFAULT_SEED = 42
@@ -51,7 +52,9 @@ def get_prob_params() -> StructureInformedBayesParams:
     return StructureInformedBayesParams()
 
 
-def build_analyzers(pil_gamma_fitter, throat_lengths_weibull_fitter):
+def build_analyzers(
+    pil_gamma_fitter: GammaFitter, throat_lengths_weibull_fitter: WeibullFitter
+) -> List[Tuple[AnalyzerLike, str]]:
     """Construct each analyzer once, outside the timed region.
 
     Construction loads DM thresholds and fits the NP threshold used by SIB;
@@ -80,7 +83,7 @@ def build_analyzers(pil_gamma_fitter, throat_lengths_weibull_fitter):
     ]
 
 
-def environment_metadata() -> dict:
+def environment_metadata() -> Dict[str, Any]:
     return {
         "python_version": platform.python_version(),
         "platform": platform.platform(),
@@ -98,9 +101,18 @@ class WalkSimulator(Protocol):
     def run(self, length: int) -> object: ...
 
 
+class AnalyzerLike(Protocol):
+    """Structural type for `measure_complexity`'s analyzers argument: only
+    `run(trajectory)` is used, so any object with that method works,
+    including test doubles that don't subclass `TrajectoryAnalyzer` (and
+    don't take a real `Trajectory`, matching `WalkSimulator` above)."""
+
+    def run(self, trajectory: Any) -> object: ...
+
+
 def measure_complexity(
     simulator: WalkSimulator,
-    analyzers: list,
+    analyzers: Sequence[Tuple[AnalyzerLike, str]],
     trajectory_lengths: np.ndarray,
     repeats: int,
     seed: int,
@@ -133,13 +145,14 @@ def measure_complexity(
 
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Complexity estimation for trajectory analyzers"
     )
     parser.add_argument(
         "path",
         type=Path,
-        help="Data directory (contains pi_l_gamma_fitter.pkl etc.)",
+        help="Data directory (contains pi_l_gamma_fitter.json etc.)",
     )
     parser.add_argument("output", type=Path, help="Output PDF path")
     parser.add_argument("--min-length", type=int, default=DEFAULT_MIN_LENGTH)
@@ -155,13 +168,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
     path_to_main = str(args.path)
 
-    path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
-    path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
+    path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.json")
+    path_to_tl_wf: str = join(
+        path_to_main, "throat_lengths_weibull_fitter.json"
+    )
     path_to_radiuses: str = join(path_to_main, "radiuses.npy")
 
     if isfile(path_to_pil_gf):
-        with open(path_to_pil_gf, "rb") as f:
-            pil_gamma_fitter = pickle.load(f)
+        with open(path_to_pil_gf) as f:
+            pil_gamma_fitter = GammaFitter.from_dict(json.load(f))
     else:
         raise RuntimeError("pi_l data not found")
 
@@ -171,8 +186,10 @@ if __name__ == '__main__':
         raise RuntimeError("radiuses not found")
 
     if isfile(path_to_tl_wf):
-        with open(path_to_tl_wf, "rb") as f:
-            throat_lengths_weibull_fitter = pickle.load(f)
+        with open(path_to_tl_wf) as f:
+            throat_lengths_weibull_fitter = WeibullFitter.from_dict(
+                json.load(f)
+            )
     else:
         raise RuntimeError("throat_lengths not found")
 
@@ -239,7 +256,7 @@ if __name__ == '__main__':
                 "log_log_intercept": float(p[1]),
             }
         )
-        print(f"{name}: p = {p}")
+        kprint(f"{name}: p = {p}")
 
         errorbar = plt.errorbar(
             plot_lengths,

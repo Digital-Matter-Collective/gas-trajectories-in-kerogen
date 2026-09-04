@@ -1,4 +1,4 @@
-"""Sidecar provenance manifests for pickle/npy result caches (P1-06).
+"""Sidecar provenance manifests for npz/npy/json result caches (P1-06).
 
 Every cache-worthy result file `X` gets a companion `X.manifest.json`
 recording the parameters it was produced with. This intentionally does not

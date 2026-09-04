@@ -1,6 +1,7 @@
-from typing import cast
+from typing import Any, Tuple, cast
 
 import numpy as np
+import pytest
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
@@ -23,16 +24,18 @@ def _trajectory(point_count: int) -> Trajectory:
     return Trajectory(points, times, box)
 
 
-def test_hybrid_recomputes_dm_mask_for_each_trajectory(monkeypatch) -> None:
+def test_hybrid_recomputes_dm_mask_for_each_trajectory(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     dm_results = [
         np.zeros(9, dtype=np.bool_),
         np.ones(10, dtype=np.bool_),
     ]
 
-    def fake_dm_run(self, trj):
+    def fake_dm_run(self: Any, trj: Any) -> np.ndarray:
         return dm_results.pop(0)
 
-    def fake_sib_analyze(self, trj):
+    def fake_sib_analyze(self: Any, trj: Any) -> Tuple[float, np.ndarray]:
         probabilities = np.full(trj.count_points - 1, 0.5, dtype=np.float32)
         return 0.5, probabilities
 
@@ -54,7 +57,7 @@ def test_hybrid_recomputes_dm_mask_for_each_trajectory(monkeypatch) -> None:
             DistanceMatrixParams(),
         ),
         pi_l_gf=cast(GammaFitter, None),
-        throat_lengthes_wf=cast(WeibullFitter, None),
+        throat_lengths_wf=cast(WeibullFitter, None),
     )
 
     first = analyzer.run(_trajectory(10))
@@ -65,13 +68,15 @@ def test_hybrid_recomputes_dm_mask_for_each_trajectory(monkeypatch) -> None:
     assert not dm_results
 
 
-def test_hybrid_dm_override_is_used_once(monkeypatch) -> None:
+def test_hybrid_dm_override_is_used_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     computed = np.zeros(9, dtype=np.bool_)
 
-    def fake_dm_run(self, trj):
+    def fake_dm_run(self: Any, trj: Any) -> np.ndarray:
         return computed
 
-    def fake_sib_analyze(self, trj):
+    def fake_sib_analyze(self: Any, trj: Any) -> Tuple[float, np.ndarray]:
         probabilities = np.full(trj.count_points - 1, 0.5, dtype=np.float32)
         return 0.5, probabilities
 
@@ -93,7 +98,7 @@ def test_hybrid_dm_override_is_used_once(monkeypatch) -> None:
             DistanceMatrixParams(),
         ),
         pi_l_gf=cast(GammaFitter, None),
-        throat_lengthes_wf=cast(WeibullFitter, None),
+        throat_lengths_wf=cast(WeibullFitter, None),
     )
     analyzer.set_trap_approx(np.ones(9, dtype=np.bool_))
 

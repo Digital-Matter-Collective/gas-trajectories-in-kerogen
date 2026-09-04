@@ -1,4 +1,3 @@
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -20,8 +19,8 @@ def test_path() -> Path:
 
 @pytest.fixture
 def trajectory(test_path: Path) -> Trajectory:
-    with (test_path / "trajectory.pickle").open("rb") as file:
-        return pickle.load(file)  # type: ignore[no-any-return]
+    with np.load(test_path / "trajectory.npz") as data:
+        return Trajectory.from_npz_arrays("traj", data)
 
 
 @pytest.fixture

@@ -5,9 +5,11 @@ from os import listdir
 from os.path import isfile, join
 from pathlib import Path
 
+from utils.logging_setup import setup_logging
 from utils.utils import get_float_img_pattern, kprint
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Extract PNM from binary images"
     )

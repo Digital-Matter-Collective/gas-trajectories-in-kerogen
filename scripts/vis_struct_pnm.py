@@ -7,10 +7,12 @@ from scipy import ndimage
 
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
+from utils.logging_setup import setup_logging
+from utils.utils import kprint
 from visualizer.visualizer import Visualizer
 
 
-def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
+def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str) -> None:
     r, tl, ll, positions = Reader.read_pnm_ext_data(pnm_path)
 
     colors_data = {
@@ -39,7 +41,7 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
     float_img = ndimage.gaussian_filter(float_img, 4)
     float_img = np.pad(float_img, [(1, 1), (1, 1), (1, 1)], 'maximum')
     float_img[:, (float_img.shape[1] // 2) :, :] = 10.0 * float_img.max()
-    print(float_img.mean(), float_img.min(), float_img.max())
+    kprint(float_img.mean(), float_img.min(), float_img.max())
 
     rad = tl[:, 0].mean()
 
@@ -61,6 +63,7 @@ def read_and_draw_pnm_and_img(pnm_path: str, path_to_img: str):
 
 
 if "__main__" == __name__:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Visualize PNM and structure image"
     )

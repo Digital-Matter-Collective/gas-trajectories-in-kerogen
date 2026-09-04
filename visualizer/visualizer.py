@@ -1,12 +1,7 @@
-import sys
-from dataclasses import dataclass
 from enum import Enum
-from os.path import realpath
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-import matplotlib.pylab as plt
-import networkx as nx
 import numpy as np
 import numpy.typing as npt
 import vtk
@@ -18,7 +13,6 @@ from vtkmodules.vtkFiltersCore import vtkGlyph3D, vtkTubeFilter
 from vtkmodules.vtkFiltersModeling import vtkOutlineFilter
 from vtkmodules.vtkFiltersSources import (
     vtkCubeSource,
-    vtkLineSource,
     vtkSphereSource,
 )
 from vtkmodules.vtkInteractionStyle import vtkInteractorStyleTrackballCamera
@@ -41,22 +35,17 @@ from vtkmodules.vtkRenderingCore import (
 )
 from vtkmodules.vtkRenderingOpenGL2 import vtkOpenGLRenderer
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.boundingbox import BoundingBox  # noqa: E402
-from base.trajectory import Trajectory  # noqa: E402
-from visualizer.timer_callback_camera import (  # noqa: E402
-    vtkTimerCallbackCamera,
-)
-from visualizer.win_struct_collection import WinStructCollection  # noqa: E402
+from base.boundingbox import BoundingBox
+from base.trajectory import Trajectory
+from utils.utils import kprint
+from visualizer.timer_callback_camera import vtkTimerCallbackCamera
+from visualizer.win_struct_collection import WinStructCollection
 
 
 def visualize_trajectory(
-    traj: Trajectory, color_type='dist', win_name: str = ""
+    traj: Trajectory, color_type: str = 'dist', win_name: str = ""
 ) -> None:
-    Visualizer.draw_trajectoryes(
+    Visualizer.draw_trajectories(
         [traj],
         color_type=color_type,
         wrap_mode=WrapMode.EMPTY,
@@ -86,99 +75,21 @@ _OFFSCREEN_IMAGE_WRITERS = {
 }
 
 
-@dataclass
-class AnimationActorData:
-    sphere_actor: vtkActor
-    # polyline_actor: vtkActor
-    points: npt.NDArray[np.float32]
-    # dists: npt.NDArray[np.float32]
-    # polydata: vtkPolyData
-    # tube_filter: vtkTubeFilter
-    radius: float
-
-
-class vtkTimerCallbackActors:
-    def __init__(self, data: List[AnimationActorData], iren):
-        self.timer_count = 0
-        self.steps = data[0].points.shape[0]
-        self.data = data
-        self.iren = iren
-        self.timerId: Optional[int] = None
-
-    def execute(self, obj, event) -> None:
-        step = 0
-        while step < self.steps:
-            for aad in self.data:
-                p = aad.points[step, :]
-                aad.sphere_actor.SetPosition(p[0], p[1], p[2])
-                # color_data = vtkTimerCallbackActors.create_color_data(aad, step, 10)
-                # aad.polydata.GetPointData().AddArray(color_data)
-                # aad.tube_filter.Set
-            iren = obj
-            iren.GetRenderWindow().Render()
-            # time.sleep(0.1)
-            self.timer_count += 1
-            step += 1
-        print("end")
-        if self.timerId:
-            iren.DestroyTimer(self.timerId)
-
-    # @staticmethod
-    # def create_color_data(aad:AnimationActorData, step:int, max_len:int)->vtkDoubleArray:
-    #     color_data = vtkDoubleArray()
-    #     color_data.SetName("color_data")
-    #     count_points = aad.points.shape[0]
-    #     cdists = np.cumsum(aad.dists)
-    #     min_dist = 1e-4
-    #     for i in range(count_points):
-    #         d = step - i
-    #         if d > 0 and d <= max_len:
-    #             v = cdists[i-1]/cdists[-1]
-    #             color_data.InsertNextValue(max(v,min_dist))
-    #         else:
-    #             color_data.InsertNextValue(0)
-    #     return color_data
-
-
 class Visualizer:
 
-    def critical_u(H):
-        return H * np.exp(H + 1)
-
-    def add_vert(x, color=None, ymax=310):
-        plt.plot([x, x], [0, ymax], linewidth=3, color=color)
-
-    def draw_hist(igraph, mrange=(1, 240), rwidth=1, bins=80, xticks=None):
-        degree = np.array([d[1] for d in igraph.degree()], dtype=int)
-
-        hist = np.zeros(shape=(degree.max() + 1,), dtype=int)
-        for d in degree:
-            hist[d] += 1
-
-        plt.hist(
-            degree,
-            bins=bins,
-            histtype='bar',
-            range=mrange,
-            rwidth=rwidth,
-            color='#50ba81',
-        )  # 5081ba
-        plt.xticks(xticks, fontsize=18)
-        plt.yticks(None, fontsize=18)
-        return degree, hist
-
+    @staticmethod
     def draw_graph_and_img(
-        G,
-        img,
-        node_pos_corr,
-        bbox,
-        size_node=0.25,
-        size_edge=0.02,
-        save_pos_path='',
-        scale="full_by_1",
-        plot_box=True,
-        **kwargs,
-    ):
+        G: Any,
+        img: npt.NDArray[Any],
+        node_pos_corr: Any,
+        bbox: BoundingBox,
+        size_node: float = 0.25,
+        size_edge: float = 0.02,
+        save_pos_path: str = '',
+        scale: str = "full_by_1",
+        plot_box: bool = True,
+        **kwargs: Any,
+    ) -> None:
         renderer = vtkRenderer()
 
         positions = None
@@ -253,15 +164,16 @@ class Visualizer:
         renWin.SetSize(1900, 1080)
         iren.Start()
 
+    @staticmethod
     def draw_nxvtk(
-        G,
-        node_pos_corr,
-        size_node=0.25,
-        size_edge=0.02,
-        save_pos_path='',
-        scale="full_by_1",
-        **kwargs,
-    ):
+        G: Any,
+        node_pos_corr: Any,
+        size_node: float = 0.25,
+        size_edge: float = 0.02,
+        save_pos_path: str = '',
+        scale: str = "full_by_1",
+        **kwargs: Any,
+    ) -> None:
         """
         Draw networkx graph in 3d with nodes at node_pos.
 
@@ -342,57 +254,16 @@ class Visualizer:
         renWin.SetSize(1900, 1080)
         iren.Start()
 
-    def split_view(
-        data1,
-        data2,
-        size_node=0.25,
-        size_edge=0.03,
-        save_pos_path='',
-        scale="full_by_1",
-        **kwargs,
-    ):
-        xmins = [0, 0.5]
-        xmaxs = [0.5, 1]
-        ymins = [0] * 2
-        ymaxs = [1] * 2
-
-        rw = vtkRenderWindow()
-        iren = vtkRenderWindowInteractor()
-        iren.SetRenderWindow(rw)
-        cameras = []
-        for i, data in enumerate([data1, data2]):
-            ren = vtkRenderer()
-
-            camera = ren.GetActiveCamera()
-            camera.SetFocalPoint(0, 0, 0)
-            camera.SetPosition(140, 140, 140)
-            cameras.append(camera)
-
-            rw.AddRenderer(ren)
-            ren.SetViewport(xmins[i], ymins[i], xmaxs[i], ymaxs[i])
-            Visualizer.draw_graph(
-                ren, data, size_node, size_edge, save_pos_path, scale, **kwargs
-            )
-
-        if 'animation' in kwargs:
-            # Sign up to receive TimerEvent
-            cb = vtkTimerCallbackCamera(5000, [], cameras, iren)
-            iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
-            cb.timerId = iren.CreateRepeatingTimer(500)
-
-        rw.SetSize(1900, 1080)
-        rw.Render()
-        iren.Start()
-
+    @staticmethod
     def draw_graph(
-        ren,
-        graph_pos_corr,
-        size_node=0.25,
-        size_edge=0.02,
-        save_pos_path='',
-        scale="full_by_1",
-        **kwargs,
-    ):
+        ren: vtkRenderer,
+        graph_pos_corr: Any,
+        size_node: float = 0.25,
+        size_edge: float = 0.02,
+        save_pos_path: str = '',
+        scale: str = "full_by_1",
+        **kwargs: Any,
+    ) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         mrange = 1e2
         i = 0
 
@@ -433,7 +304,7 @@ class Visualizer:
                     d = (positions[:, i] - a_min[i]) / dmax
                     positions[:, i] = ((d - d.max() / 2)) * mrange
 
-        print(f"min = {positions.min(axis=0)}, max = {positions.max(axis=0)}")
+        kprint(f"min = {positions.min(axis=0)}, max = {positions.max(axis=0)}")
 
         if len(save_pos_path) != 0:
             with open(save_pos_path[0], 'wb') as f:
@@ -551,39 +422,11 @@ class Visualizer:
         diff = a_max - a_min
         return mid, mid + 2 * diff
 
-    def showGraph(
-        G,
-        size_node=0.25,
-        size_edge=0.02,
-        layout='kamada',
-        save_pos_path='',
-        **kwargs,
-    ):
-        graph = nx.Graph(G)
-
-        # print(f"sqrt={np.sqrt(len(graph.nodes()))}")
-        edges = [(i, j, 1) for i, j in graph.edges()]
-        graph.add_weighted_edges_from(edges)
-        if layout == 'kamada':
-            layout = nx.kamada_kawai_layout(graph, dim=3)
-        elif layout == 'spring':
-            layout = nx.spring_layout(graph, dim=3)
-        elif layout == 'spectral':
-            layout = nx.spectral_layout(graph, dim=3)
-        Visualizer.draw_nxvtk(
-            graph,
-            layout,
-            size_node,
-            size_edge,
-            save_pos_path=save_pos_path,
-            **kwargs,
-        )
-
     @staticmethod
     def save_offscreen_render(
         renWin: vtkRenderWindow,
         output_path: str,
-        window_size: tuple = (1900, 1080),
+        window_size: Tuple[int, int] = (1900, 1080),
     ) -> None:
         """Render `renWin` off-screen at a fixed size and save it to a file.
 
@@ -640,7 +483,7 @@ class Visualizer:
         return image_data
 
     @staticmethod
-    def create_volume_img(image_data) -> vtk.vtkVolume:
+    def create_volume_img(image_data: "vtk.vtkImageData") -> vtk.vtkVolume:
         composite_opacity = vtk.vtkPiecewiseFunction()
         composite_opacity.AddPoint(0.0, 0.3)
         composite_opacity.AddPoint(0.98, 0.3)
@@ -669,7 +512,9 @@ class Visualizer:
         return volume
 
     @staticmethod
-    def create_actor_img(image_data, **kwargs) -> vtkActor:
+    def create_actor_img(
+        image_data: "vtk.vtkImageData", **kwargs: Any
+    ) -> vtkActor:
         if image_data.GetScalarType() == vtk.VTK_INT:
             marchingcube = vtk.vtkDiscreteFlyingEdges3D()
         else:
@@ -703,7 +548,7 @@ class Visualizer:
         ren: vtkRenderer,
         img: npt.NDArray[Any],
         bbox: Optional[BoundingBox],
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         image_data = Visualizer.create_img_data(img, bbox)
 
@@ -726,8 +571,8 @@ class Visualizer:
         bbox: BoundingBox,
         *,
         output_path: Optional[str] = None,
-        window_size: tuple = (1900, 1080),
-        **kwargs,
+        window_size: Tuple[int, int] = (1900, 1080),
+        **kwargs: Any,
     ) -> None:
         ren = vtkRenderer()
 
@@ -779,8 +624,8 @@ class Visualizer:
         bbox: BoundingBox,
         *,
         output_path: Optional[str] = None,
-        window_size: tuple = (1900, 1080),
-        **kwargs,
+        window_size: Tuple[int, int] = (1900, 1080),
+        **kwargs: Any,
     ) -> None:
         renderer = vtkOpenGLRenderer()
 
@@ -824,7 +669,7 @@ class Visualizer:
     @staticmethod
     def create_trajectory_actor(
         trj: Trajectory,
-        **kwargs,
+        **kwargs: Any,
     ) -> vtkActor:
         points = (
             trj.points_without_periodic
@@ -851,9 +696,9 @@ class Visualizer:
         )[0]
 
     @staticmethod
-    def draw_trajectoryes(
+    def draw_trajectories(
         trjs: List[Trajectory],
-        color_type='dist',
+        color_type: str = 'dist',
         periodic: bool = False,
         wrap_mode: WrapMode = WrapMode.EMPTY,
         with_points: bool = False,
@@ -937,7 +782,7 @@ class Visualizer:
             for col, win_name in to_rm:
                 col.clear()
                 collection.remove(col)
-                print('Window', win_name, 'has stopped running.')
+                kprint('Window', win_name, 'has stopped running.')
             if len(collection) == 0:
                 break
             cont_flag = all(x.running is True for x in collection)
@@ -967,25 +812,6 @@ class Visualizer:
         actor.GetProperty().LightingOff()
 
         return actor
-
-    @staticmethod
-    def create_box_actor2(box: BoundingBox) -> vtkActor:
-        lineSource = vtkLineSource()
-        bmin = box.min()
-        bmax = box.max()
-        lineSource.SetPoint1(float(bmin[0]), float(bmin[1]), float(bmin[2]))
-        lineSource.SetPoint2(float(bmax[0]), float(bmax[1]), float(bmax[2]))
-
-        colors = vtkNamedColors()
-        outline = vtkOutlineFilter()
-        outline.SetInputConnection(lineSource.GetOutputPort())
-        outlineMapper = vtkPolyDataMapper()
-        outlineMapper.SetInputConnection(outline.GetOutputPort())
-        outlineActor = vtkActor()
-        outlineActor.SetMapper(outlineMapper)
-        outlineActor.GetProperty().SetColor(colors.GetColor3d('Black'))
-        outlineActor.GetProperty().SetLineWidth(3.0)
-        return outlineActor
 
     @staticmethod
     def create_axes_actor(bbox: BoundingBox, camera: vtkCamera) -> vtkActor:
@@ -1130,7 +956,7 @@ class Visualizer:
     @staticmethod
     def create_trj_points_actor(
         trj: Trajectory,
-        **kwargs,
+        **kwargs: Any,
     ) -> vtkActor:
         tp = (
             trj.points_without_periodic
@@ -1215,45 +1041,11 @@ class Visualizer:
         return actor
 
     @staticmethod
-    def draw_trajectory_points(trj: Trajectory) -> None:
-        actor = Visualizer.create_trj_points_actor(
-            trj, periodic=False, color_type='dist', radius=1.0
-        )
-
-        renderer = vtkRenderer()
-        renderer.AddActor(actor)
-
-        trj_actor = Visualizer.create_trajectory_actor(
-            trj, periodic=False, color_type='dist', radius=1.0
-        )
-        renderer.AddActor(trj_actor)
-
-        colors = vtkNamedColors()
-
-        renderer.SetBackground(colors.GetColor3d("White"))
-        renderer.ResetCamera()
-        renderer.GetActiveCamera().Azimuth(90)
-
-        renWin = vtkRenderWindow()
-        renWin.AddRenderer(renderer)
-        renWin.SetSize(1900, 1060)
-        renWin.SetWindowName('Trajectory')
-        renWin.Render()
-
-        # style = vtkInteractorStyleTrackballCamera()
-
-        iren = vtkRenderWindowInteractor()
-        iren.SetRenderWindow(renWin)
-        # iren.SetInteractorStyle(style)
-        win_col = WinStructCollection(iren)
-        collection.append(win_col)
-
-    @staticmethod
     def draw_img_trj(
         img: npt.NDArray[Any],
         bbox: BoundingBox,
         trj: Trajectory,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         renderer = vtkRenderer()
 
@@ -1303,65 +1095,4 @@ class Visualizer:
         iren.Initialize()
         renWin.Render()
         renWin.SetSize(1900, 1080)
-        iren.Start()
-
-    @staticmethod
-    def animate_trajectoryes(
-        trjs: List[Trajectory], periodic: bool = False, plot_box: bool = True
-    ) -> None:
-        def discr(
-            points: npt.NDArray[np.float32], count: int
-        ) -> npt.NDArray[np.float32]:
-            npoints = np.zeros(
-                shape=((count + 1) * (points.shape[0] - 1) + 1, 3),
-                dtype=np.float32,
-            )
-            for i in range(points.shape[0] - 1):
-                d = points[i + 1] - points[i]
-                for j in range(count + 1):
-                    npoints[j + i * (count + 1)] = points[i] + j * d / (
-                        count + 1
-                    )
-            npoints[-1] = points[-1]
-            return npoints
-
-        renderer = vtkRenderer()
-        data = []
-        for trj in trjs:
-            radius = trj.atom_size * 0.25
-            p = trj.points if periodic else trj.points_without_periodic
-            sphere_actor = Visualizer.create_sphere_actor(
-                p[0, :], trj.atom_size
-            )
-
-            renderer.AddActor(sphere_actor)
-            npoints = discr(p, 5)
-            data.append(AnimationActorData(sphere_actor, npoints, radius))
-        if plot_box:
-            outfit_actor = Visualizer.create_box_actor(trjs[0].box)
-            renderer.AddActor(outfit_actor)
-
-        colors = vtkNamedColors()
-
-        renderer.SetBackground(colors.GetColor3d("White"))
-        renderer.ResetCamera()
-        renderer.GetActiveCamera().Azimuth(90)
-
-        renWin = vtkRenderWindow()
-        renWin.AddRenderer(renderer)
-        renWin.SetSize(1900, 1060)
-        renWin.SetWindowName('Trajectory')
-
-        style = vtkInteractorStyleTrackballCamera()
-
-        iren = vtkRenderWindowInteractor()
-        iren.SetRenderWindow(renWin)
-        iren.SetInteractorStyle(style)
-        iren.Initialize()
-
-        cb = vtkTimerCallbackActors(data, iren)
-        iren.AddObserver(vtkCommand.TimerEvent, cb.execute)
-        cb.timerId = iren.CreateRepeatingTimer(2000)
-
-        renWin.Render()
         iren.Start()

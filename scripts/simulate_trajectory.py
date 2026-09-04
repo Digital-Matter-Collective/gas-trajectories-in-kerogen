@@ -1,21 +1,18 @@
 import argparse
-import pickle
-import sys
-from os.path import isfile, join, realpath
+import json
+from os.path import isfile, join
 from pathlib import Path
 
 import numpy as np
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.bufferedsampler import BufferedSampler  # noqa: E402
-from base.discretecdf import DiscreteCDF  # noqa: E402
-from base.empiricalcdf import EmpiricalCDF  # noqa: E402
-from processes.kerogen_walk_simulator import KerogenWalkSimulator  # noqa: E402
-from utils.utils import create_empirical_cdf, ps_generate  # noqa: E402
-from visualizer.visualizer import Visualizer, WrapMode  # noqa: E402
+from base.bufferedsampler import BufferedSampler
+from base.discretecdf import DiscreteCDF
+from base.empiricalcdf import EmpiricalCDF
+from processes.distribution_fitter import WeibullFitter
+from processes.kerogen_walk_simulator import KerogenWalkSimulator
+from utils.logging_setup import setup_logging
+from utils.utils import create_empirical_cdf, ps_generate
+from visualizer.visualizer import Visualizer, WrapMode
 
 
 def run(
@@ -34,10 +31,14 @@ def run(
     else:
         raise RuntimeError("radiuses not found")
 
-    path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
+    path_to_tl_wf: str = join(
+        path_to_main, "throat_lengths_weibull_fitter.json"
+    )
     if isfile(path_to_tl_wf):
-        with open(path_to_tl_wf, "rb") as f:
-            throat_lengths_weibull_fitter = pickle.load(f)
+        with open(path_to_tl_wf) as f:
+            throat_lengths_weibull_fitter = WeibullFitter.from_dict(
+                json.load(f)
+            )
     else:
         raise RuntimeError("throat_lengths not found")
 
@@ -50,7 +51,7 @@ def run(
         bs_psd, bs_ps, bs_ptl, k, p, with_history=False
     )
     traj = simulator.run(steps)
-    Visualizer.draw_trajectoryes(
+    Visualizer.draw_trajectories(
         [traj],
         radius=radius,
         periodic=False,
@@ -61,7 +62,8 @@ def run(
     Visualizer.show()
 
 
-if __name__ == '__main__':
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Simulate and visualize one kerogen gas-molecule trajectory"
     )
@@ -86,3 +88,7 @@ if __name__ == '__main__':
     run(
         str(args.path), k=args.k, p=args.p, steps=args.steps, radius=args.radius
     )
+
+
+if __name__ == '__main__':
+    main()

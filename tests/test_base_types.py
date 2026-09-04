@@ -1,4 +1,5 @@
 import io
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -38,7 +39,9 @@ def test_is_intersect_borders_does_not_raise_and_returns_bool() -> None:
     assert result in (True, False, np.True_, np.False_)
 
 
-def test_writer_reads_points_without_periodic_as_a_property(tmp_path) -> None:
+def test_writer_reads_points_without_periodic_as_a_property(
+    tmp_path: Path,
+) -> None:
     from base.writer import Writer
 
     trj = _make_trajectory()

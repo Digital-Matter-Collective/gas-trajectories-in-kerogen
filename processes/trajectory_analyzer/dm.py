@@ -1,7 +1,7 @@
 import pickle
 from dataclasses import dataclass, field
 from importlib import resources
-from typing import List, Optional, Sequence, Tuple, cast
+from typing import Dict, List, Optional, Sequence, Tuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -87,9 +87,9 @@ class DistanceMatrixParams:
     p_value: float = 0.01
 
     @staticmethod
-    def all_params():
+    def all_params() -> Dict[int, Tuple[int, float, float, str, int]]:
         # good params  [154, 162, 186]
-        params = {}
+        params: Dict[int, Tuple[int, float, float, str, int]] = {}
         i = 0
         for dp in [0, 10, 50]:  # 0 - bad
             for pv in [0.01, 0.1, 0.9]:  # 0.9 - bad
@@ -319,7 +319,7 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         return list_vertical, list_diagonal, list_parallel
 
     def extract_invariants(
-        self, matrix, N
+        self, matrix: NPBArray, N: int
     ) -> Tuple[NPIArray, NPIArray, NPIArray]:
         list_diagonal = np.zeros(shape=(N,), dtype=np.int64)
         list_vertical = np.zeros(shape=(N,), dtype=np.int64)
@@ -381,7 +381,9 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         return result
 
     @staticmethod
-    def get_up_down(index, n, bin_arr, vert_arr):
+    def get_up_down(
+        index: int, n: int, bin_arr: NPBArray, vert_arr: NPBArray
+    ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         return find_min_max_index(index, bin_arr), find_min_max_index(
             n, vert_arr
         )

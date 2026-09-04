@@ -5,14 +5,16 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from itertools import repeat
 from pathlib import Path
-from typing import List, cast
+from typing import Callable, List, Tuple, cast
 
 import numpy as np
+import numpy.typing as npt
 from matplotlib import pyplot as plt
 from matplotlib.ticker import FormatStrFormatter
 
 from base.trajectory import Trajectory
 from utils.cache_manifest import check_cache, write_manifest
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 _IMAGE_PATTERN = re.compile(
@@ -48,7 +50,9 @@ def scan_image_infos(images_dir: Path) -> list[tuple[float, str]]:
     return sorted(infos, key=lambda x: x[0])
 
 
-def extract_mean_displacement(trajectories, traj_stride: int = 1) -> RMSDResult:
+def extract_mean_displacement(
+    trajectories: List[Trajectory], traj_stride: int = 1
+) -> RMSDResult:
     a_msd = []
     a_t = []
 
@@ -64,8 +68,8 @@ def extract_mean_displacement(trajectories, traj_stride: int = 1) -> RMSDResult:
 
 
 def plot_corrfunc_and_md(
-    dt,
-    C_t,
+    dt: npt.NDArray[np.float64],
+    C_t: npt.NDArray[np.float64],
     trj_msd_list: List[tuple[RMSDResult, str]],
     save_path: Path | None = None,
     max_t: float = 2.8,
@@ -160,11 +164,11 @@ def plot_corrfunc_and_md(
 
 
 def correlation_average_time(
-    image_infos,
-    load_img,
+    image_infos: List[tuple[float, str]],
+    load_img: Callable[[str], npt.NDArray[np.int8]],
     ct_save_path: Path,
     num_workers: int = 4,
-):
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     """
     Time-averaged autocorrelation function:
 
@@ -202,7 +206,9 @@ def correlation_average_time(
         C_t = np.full(n, np.nan, dtype=np.float64)
         write_manifest(ct_save_path, cache_metadata)
 
-    def process(chunk_i, lag):
+    def process(
+        chunk_i: npt.NDArray[np.int32], lag: int
+    ) -> npt.NDArray[np.float64]:
         result = np.full(len(chunk_i), np.nan, dtype=np.float64)
         for local_idx, i in enumerate(chunk_i):
             img_i = load_img(img_files[i])
@@ -240,6 +246,7 @@ def correlation_average_time(
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description=(
             "Compute time-averaged autocorrelation C(t) from binarized images "
@@ -318,7 +325,7 @@ def main() -> None:
 
     trj_msd_list = []
     for trj_path, label in args.trj:
-        trajectories = Trajectory.read_trajectoryes(trj_path)
+        trajectories = Trajectory.read_trajectories(trj_path)
         res = extract_mean_displacement(trajectories)
         trj_msd_list.append((res, label))
 

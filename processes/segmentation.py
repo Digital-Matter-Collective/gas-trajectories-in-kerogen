@@ -2,7 +2,7 @@ import math
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from enum import Enum
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -11,6 +11,7 @@ from scipy.spatial.distance import cdist
 
 from base.boundingbox import KerogenBox, Range
 from base.kerogendata import KerogenData
+from utils.utils import kprint
 
 
 class BinarizeAlgo(Enum):
@@ -20,14 +21,14 @@ class BinarizeAlgo(Enum):
     PROCESS_CHUNK = "process_chunk"
 
 
-_proc_worker_state: Dict = {}
+_proc_worker_state: Dict[str, Any] = {}
 
 
 def _proc_worker_init(
-    bb: list,
+    bb: List[KerogenBox],
     vox_sizes: "np.ndarray",
     mins: "np.ndarray",
-    img_size: tuple,
+    img_size: Tuple[int, int, int],
     atom_chunk: int,
     yz_flat: "np.ndarray",
 ) -> None:
@@ -41,7 +42,9 @@ def _proc_worker_init(
     )
 
 
-def _proc_worker_process_chunk(chunk_indices: List[int]) -> List[tuple]:
+def _proc_worker_process_chunk(
+    chunk_indices: List[int],
+) -> List[Tuple[int, npt.NDArray[np.int8]]]:
     s = _proc_worker_state
     bb = s["bb"]
     vox_sizes = s["vox_sizes"]
@@ -79,9 +82,7 @@ def _proc_worker_process_chunk(chunk_indices: List[int]) -> List[tuple]:
                 ).any(axis=1)
             atom_mask[in_bb] |= mask_in
         results.append((ix, (~atom_mask).reshape(Ny, Nz).astype(np.int8)))
-    print(
-        f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!"
-    )
+    kprint(f"Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!")
     return results
 
 
@@ -251,7 +252,7 @@ class Segmentator:
         if algo == BinarizeAlgo.SEQUENTIAL:
             for ix in range(Nx):
                 img[ix] = process_slice(ix)
-                print(f" --- Slice {ix}-x finished!")
+                kprint(f"Slice {ix}-x finished!")
 
         elif algo == BinarizeAlgo.THREAD_SLICE:
             n = min(num_workers, Nx)
@@ -260,16 +261,18 @@ class Segmentator:
                     executor.map(process_slice, range(Nx))
                 ):
                     img[ix] = result
-                    print(f" --- Slice {ix}-x finished!")
+                    kprint(f"Slice {ix}-x finished!")
 
         elif algo == BinarizeAlgo.THREAD_CHUNK:
             n = min(num_workers, Nx)
             chunks = Segmentator._make_chunks(Nx, chunk_size)
 
-            def process_chunk_thread(chunk_indices: List[int]) -> List[tuple]:
+            def process_chunk_thread(
+                chunk_indices: List[int],
+            ) -> List[Tuple[int, npt.NDArray[np.int8]]]:
                 results = [(ix, process_slice(ix)) for ix in chunk_indices]
-                print(
-                    f" --- Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!"
+                kprint(
+                    f"Chunk slices {chunk_indices[0]}..{chunk_indices[-1]}-x finished!"
                 )
                 return results
 
@@ -318,7 +321,7 @@ class Segmentator:
             algos = list(BinarizeAlgo)
         results: Dict[str, float] = {}
         for algo in algos:
-            print(f" --- [benchmark] Starting {algo.value} ...")
+            kprint(f"[benchmark] Starting {algo.value} ...")
             t0 = time.perf_counter()
             self.binarize(
                 num_workers=num_workers,
@@ -327,14 +330,13 @@ class Segmentator:
                 chunk_size=chunk_size,
             )
             results[algo.value] = time.perf_counter() - t0
-            print(f" --- [benchmark] {algo.value}: {results[algo.value]:.3f}s")
+            kprint(f"[benchmark] {algo.value}: {results[algo.value]:.3f}s")
 
         baseline = results.get(BinarizeAlgo.SEQUENTIAL.value)
-        print("\n --- Benchmark Results ---")
+        kprint("Benchmark Results")
         for name, t in results.items():
             speedup = f"  ({baseline / t:.2f}x)" if baseline and t > 0 else ""
-            print(f"     {name:<20s}: {t:8.3f}s{speedup}")
-        print()
+            kprint(f"    {name:<20s}: {t:8.3f}s{speedup}")
         return results
 
     def dist_map(self) -> npt.NDArray[np.float32]:
@@ -343,26 +345,10 @@ class Segmentator:
             for ker_s, img_s in zip(self.kerogen.box.size(), self.img_size)
         ]
 
-        def dist_to_edge(a, b, p):
-            # normalized tangent vector
-            d = np.divide(b - a, np.linalg.norm(b - a))
-
-            # signed parallel distance components
-            s = np.dot(a - p, d)[0]
-            t = np.dot(p - b, d)[0]
-
-            # clamped parallel distance
-            h = np.maximum.reduce([s, t, 0])
-
-            # perpendicular distance component
-            c = np.cross(p - a, d)
-
-            return np.hypot(h, np.linalg.norm(c))
-
         all_atom_positions = np.vstack([bb.positions for bb in self.bb])
         tree = cKDTree(all_atom_positions)
 
-        def wrap(ix):
+        def wrap(ix: int) -> npt.NDArray[np.float32]:
             ny, nz = self.img_size[1], self.img_size[2]
             box_min = self.kerogen.box.min()
             iy_idx = np.arange(ny, dtype=np.float32)
@@ -380,12 +366,14 @@ class Segmentator:
                 ]
             )  # (Ny*Nz, 3)
             dist, _ = tree.query(all_pos, k=1, workers=1)
-            result = dist.astype(np.float32).reshape(ny, nz)
-            return result
+            return cast(
+                npt.NDArray[np.float32],
+                dist.astype(np.float32).reshape(ny, nz),
+            )
 
         img = np.ones(shape=self.img_size, dtype=np.float32)
         for ix in range(self.img_size[0]):
             img[ix] = wrap(ix)
-            print(f" --- Slice {ix}-x finished!")
+            kprint(f"Slice {ix}-x finished!")
 
         return img

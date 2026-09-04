@@ -207,7 +207,7 @@ up. The reference workflow is CPU-based; no GPU is required.
   point `MPLCONFIGDIR` and `XDG_CACHE_HOME` to writable directories.
 - VTK is needed only for optional interactive visualization. Headless analysis
   and tests do not require an open display.
-- A missing `pi_l_gamma_fitter.pkl`, PNM prefix, trajectory, or cached
+- A missing `pi_l_gamma_fitter.json`, PNM prefix, trajectory, or cached
   distribution means that the requested data-dependent stage has not been
   prepared; follow the input sequence in the reproduction guide.
 - Do not mix old caches with changed inputs or parameters. Preserve current

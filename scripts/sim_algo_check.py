@@ -2,7 +2,6 @@ import argparse
 import csv
 import json
 import os
-import pickle
 import random
 from pathlib import Path
 from typing import Any, Callable, List, cast
@@ -14,7 +13,9 @@ import numpy.typing as npt
 from base.bufferedsampler import BufferedSampler
 from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
+from base.trajectory import Trajectory
 from base.trap_sequence import TrapSequence
+from processes.distribution_fitter import GammaFitter, WeibullFitter
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trajectory_analyzer.dm import DistanceMatrixAnalyzer
 from processes.trajectory_analyzer.hybrid import HybridAnalyzer, HybridParams
@@ -28,6 +29,7 @@ from processes.trajectory_analyzer.sib import (
 )
 from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
 from scripts.dm_parameter_search import K_VALUES, table_i_candidate_for_k
+from utils.logging_setup import setup_logging
 from utils.utils import create_empirical_cdf, kprint, ps_generate
 
 DEFAULT_TRAJECTORY_COUNT = 100
@@ -88,7 +90,7 @@ def _shared_error_axis_limits(
     q_high: float,
     center: str,
 ) -> tuple[float, float]:
-    extrema: List[npt.NDArray] = []
+    extrema: List[npt.NDArray[np.float64]] = []
     for errors, _ in data.values():
         low, central, high = _error_band(
             errors,
@@ -170,16 +172,43 @@ def save_error_corridor(
     return output_path
 
 
-def _atomic_pickle_dump(obj: Any, path: str | Path) -> None:
-    """Atomically replace a pickle without writing through the target file."""
+def _atomic_savez(path: str | Path, **arrays: Any) -> None:
+    """Atomically replace an .npz without writing through the target file."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     temporary = target.with_name(f".{target.name}.tmp")
     with temporary.open("wb") as file:
-        pickle.dump(obj, file, protocol=pickle.HIGHEST_PROTOCOL)
+        np.savez(file, **arrays)
         file.flush()
         os.fsync(file.fileno())
     os.replace(temporary, target)
+
+
+def _save_trajectory_cache(
+    path: Path, metadata: dict[str, object], trajectories: List[Trajectory]
+) -> None:
+    arrays: dict[str, Any] = {
+        "metadata_json": json.dumps(metadata),
+        "count": len(trajectories),
+    }
+    for index, trj in enumerate(trajectories):
+        arrays.update(trj.to_npz_arrays(f"traj_{index}"))
+    _atomic_savez(path, **arrays)
+
+
+def _load_trajectory_cache(
+    path: Path,
+) -> tuple[dict[str, object], List[Trajectory]] | None:
+    with np.load(path) as data:
+        if "metadata_json" not in data:
+            return None
+        metadata = json.loads(str(data["metadata_json"]))
+        count = int(data["count"])
+        trajectories = [
+            Trajectory.from_npz_arrays(f"traj_{index}", data)
+            for index in range(count)
+        ]
+    return metadata, trajectories
 
 
 def _atomic_json_dump(obj: Any, path: str | Path) -> None:
@@ -284,7 +313,7 @@ def trajectories_simulation(
     step_count_distribution: DiscreteCDF,
     base_seed: int,
     force_recompute: bool,
-) -> dict[tuple[float, float], list]:
+) -> dict[tuple[float, float], List[Trajectory]]:
     """Generate or resume independently seeded synthetic trajectories."""
     trajectory_dir = Path(output_dir) / "trajectories"
     trajectory_dir.mkdir(parents=True, exist_ok=True)
@@ -292,7 +321,7 @@ def trajectories_simulation(
 
     for p_index, p_value in enumerate(prob_grid):
         p = float(p_value)
-        cache_path = trajectory_dir / f"k={k:.2f}_p={p:.2f}.pkl"
+        cache_path = trajectory_dir / f"k={k:.2f}_p={p:.2f}.npz"
         metadata = _trajectory_cache_metadata(
             base_seed=base_seed,
             k=k,
@@ -303,29 +332,26 @@ def trajectories_simulation(
             step_count=step_count,
         )
 
-        cached_trajectories = []
+        cached_trajectories: List[Trajectory] = []
         if cache_path.is_file() and not force_recompute:
-            with cache_path.open("rb") as file:
-                payload = pickle.load(file)
-            if not isinstance(payload, dict) or "metadata" not in payload:
+            loaded = _load_trajectory_cache(cache_path)
+            if loaded is None:
                 raise RuntimeError(
                     f"Legacy trajectory cache without seed metadata: {cache_path}. "
                     "Rerun once with --force-recompute."
                 )
-            if payload["metadata"] != metadata:
+            cached_metadata, cached_trajectories = loaded
+            if cached_metadata != metadata:
                 raise RuntimeError(
                     f"Trajectory cache metadata mismatch: {cache_path}. "
                     "Use the original parameters or --force-recompute."
                 )
-            cached_trajectories = list(payload.get("trajectories", []))
             if len(cached_trajectories) > trajectory_count:
                 raise RuntimeError(
                     f"Too many trajectories in cache: {cache_path}"
                 )
         else:
-            _atomic_pickle_dump(
-                {"metadata": metadata, "trajectories": []}, cache_path
-            )
+            _save_trajectory_cache(cache_path, metadata, [])
 
         seeds = cast(List[int], metadata["trajectory_seeds"])
         for trajectory_index in range(
@@ -340,13 +366,7 @@ def trajectories_simulation(
                 seed=int(seeds[trajectory_index]),
             )
             cached_trajectories.append(simulator.run(step_count + 1))
-            _atomic_pickle_dump(
-                {
-                    "metadata": metadata,
-                    "trajectories": cached_trajectories,
-                },
-                cache_path,
-            )
+            _save_trajectory_cache(cache_path, metadata, cached_trajectories)
 
         trajectories[(k, p)] = cached_trajectories
         kprint(f"Trajectories ready: k={k}, p={p}, count={trajectory_count}")
@@ -425,15 +445,13 @@ def _save_analyzer_checkpoint(
     metadata: dict[str, object],
     state: dict[str, Any],
 ) -> None:
-    _atomic_pickle_dump(
-        {
-            "metadata": metadata,
-            "next_flat_index": state["next_flat_index"],
-            "k_est": state["k_est"],
-            "errors": state["errors"],
-            "results": state["results"],
-        },
+    _atomic_savez(
         checkpoint_path,
+        metadata_json=json.dumps(metadata),
+        next_flat_index=state["next_flat_index"],
+        k_est=state["k_est"],
+        errors=state["errors"],
+        results=state["results"],
     )
 
 
@@ -450,40 +468,38 @@ def _load_or_initialize_checkpoint(
         _save_analyzer_checkpoint(checkpoint_path, metadata, state)
         return state
 
-    with checkpoint_path.open("rb") as file:
-        payload = pickle.load(file)
-    if not isinstance(payload, dict):
-        raise RuntimeError(
-            f"Checkpoint metadata mismatch or legacy checkpoint: "
-            f"{checkpoint_path}. Rerun once with --force-recompute."
+    with np.load(checkpoint_path) as payload:
+        if "metadata_json" not in payload:
+            raise RuntimeError(
+                f"Checkpoint metadata mismatch or legacy checkpoint: "
+                f"{checkpoint_path}. Rerun once with --force-recompute."
+            )
+        recorded_metadata = json.loads(str(payload["metadata_json"]))
+        version_2_metadata = {
+            **metadata,
+            "trap_extractor_version": _MIGRATABLE_TRAP_EXTRACTOR_VERSION,
+        }
+        unversioned_metadata = {
+            key: value
+            for key, value in metadata.items()
+            if key != "trap_extractor_version"
+        }
+        migrate_k_est = recorded_metadata in (
+            version_2_metadata,
+            unversioned_metadata,
         )
+        if recorded_metadata != metadata and not migrate_k_est:
+            raise RuntimeError(
+                f"Checkpoint metadata mismatch or legacy checkpoint: "
+                f"{checkpoint_path}. Rerun once with --force-recompute."
+            )
 
-    recorded_metadata = payload.get("metadata")
-    version_2_metadata = {
-        **metadata,
-        "trap_extractor_version": _MIGRATABLE_TRAP_EXTRACTOR_VERSION,
-    }
-    unversioned_metadata = {
-        key: value
-        for key, value in metadata.items()
-        if key != "trap_extractor_version"
-    }
-    migrate_k_est = recorded_metadata in (
-        version_2_metadata,
-        unversioned_metadata,
-    )
-    if recorded_metadata != metadata and not migrate_k_est:
-        raise RuntimeError(
-            f"Checkpoint metadata mismatch or legacy checkpoint: "
-            f"{checkpoint_path}. Rerun once with --force-recompute."
-        )
-
-    state = {
-        "next_flat_index": payload.get("next_flat_index"),
-        "k_est": np.asarray(payload.get("k_est"), dtype=np.float64),
-        "errors": np.asarray(payload.get("errors"), dtype=np.float64),
-        "results": np.asarray(payload.get("results"), dtype=np.int8),
-    }
+        state = {
+            "next_flat_index": int(payload["next_flat_index"]),
+            "k_est": np.asarray(payload["k_est"], dtype=np.float64),
+            "errors": np.asarray(payload["errors"], dtype=np.float64),
+            "results": np.asarray(payload["results"], dtype=np.int8),
+        }
     _validate_checkpoint_state(state, result_shape, step_count)
     if migrate_k_est:
         completed_results = state["results"].reshape(-1, step_count)[
@@ -597,8 +613,8 @@ def run(
     checkpoints_dir.mkdir(parents=True, exist_ok=True)
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    pi_l_path = main_path / "pi_l_gamma_fitter.pkl"
-    throat_path = main_path / "throat_lengths_weibull_fitter.pkl"
+    pi_l_path = main_path / "pi_l_gamma_fitter.json"
+    throat_path = main_path / "throat_lengths_weibull_fitter.json"
     radiuses_path = main_path / "radiuses.npy"
     if not pi_l_path.is_file():
         raise RuntimeError(f"pi_l data not found: {pi_l_path}")
@@ -607,10 +623,10 @@ def run(
     if not radiuses_path.is_file():
         raise RuntimeError(f"radiuses not found: {radiuses_path}")
 
-    with pi_l_path.open("rb") as file:
-        pi_l_fitter = pickle.load(file)
-    with throat_path.open("rb") as file:
-        throat_fitter = pickle.load(file)
+    with pi_l_path.open() as file:
+        pi_l_fitter = GammaFitter.from_dict(json.load(file))
+    with throat_path.open() as file:
+        throat_fitter = WeibullFitter.from_dict(json.load(file))
     radiuses = np.load(radiuses_path)
 
     prob_grid = np.arange(0.0, 1.05, 0.05)
@@ -702,7 +718,7 @@ def run(
             analyzer_name = analyzer.name()
             checkpoint_path = checkpoints_dir / (
                 f"name={analyzer_name}_k={k}_count_trj={trajectory_count}_"
-                f"count_steps={step_count}.pkl"
+                f"count_steps={step_count}.npz"
             )
             metadata = _checkpoint_metadata(
                 analyzer_name=analyzer_name,
@@ -735,6 +751,7 @@ def run(
 
                 approximation(analyzer, p_index, trajectory_index)
                 result = analyzer.run(trajectory).astype(np.bool_)
+                assert trajectory.traps is not None
                 expected = trajectory.traps.astype(np.bool_)
                 if result.shape != expected.shape:
                     raise RuntimeError(
@@ -857,6 +874,7 @@ def run(
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Reproduce synthetic benchmarks for Figures 8 and 13"
     )

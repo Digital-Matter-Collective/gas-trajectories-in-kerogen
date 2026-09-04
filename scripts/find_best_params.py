@@ -1,7 +1,6 @@
 import argparse
 import csv
 import json
-import pickle
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Mapping
@@ -20,6 +19,7 @@ from scripts.dm_parameter_search import (
     result_file_name,
     validate_error_matrix_shape,
 )
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 
@@ -54,48 +54,6 @@ class TableIRow:
     source_format: str
 
 
-def _load_legacy_errors(
-    payload: dict,
-    *,
-    expected_k_index: int,
-    expected_p_index: int,
-    path: Path,
-) -> LoadedPairErrors:
-    errors = np.full(CANDIDATE_SHAPE, np.nan, dtype=np.float64)
-    for key, value in payload.items():
-        if not isinstance(key, tuple) or len(key) != 4:
-            raise ValueError(f"Unexpected legacy key {key!r} in {path}")
-        k_index, p_index, scale_index, parameter_index = key
-        if k_index != expected_k_index or p_index != expected_p_index:
-            raise ValueError(
-                f"Legacy key {key!r} does not match its file {path}"
-            )
-        if not (
-            0 <= scale_index < CANDIDATE_SHAPE[0]
-            and 0 <= parameter_index < CANDIDATE_SHAPE[1]
-        ):
-            raise ValueError(
-                f"Candidate index outside the shared grid: {key!r}"
-            )
-        if np.isfinite(errors[scale_index, parameter_index]):
-            raise ValueError(f"Duplicate legacy candidate key: {key!r}")
-        errors[scale_index, parameter_index] = float(value)
-
-    if not np.all(np.isfinite(errors)):
-        missing = int(np.count_nonzero(~np.isfinite(errors)))
-        raise ValueError(
-            f"Legacy result {path} is missing {missing} candidates"
-        )
-    return LoadedPairErrors(
-        errors=errors,
-        source_format="legacy_pickle_without_metadata",
-        error_metric="mean_misclassified_steps",
-        trajectory_count=None,
-        trajectory_points=None,
-        base_seed=None,
-    )
-
-
 def load_pair_errors(
     path: Path,
     *,
@@ -104,45 +62,35 @@ def load_pair_errors(
     k_index: int,
     p_index: int,
 ) -> LoadedPairErrors:
-    with path.open("rb") as file:
-        payload = pickle.load(file)
-    if not isinstance(payload, dict):
-        raise ValueError(f"Expected a dictionary in {path}")
+    with np.load(path) as payload:
+        if "metadata_json" not in payload:
+            raise ValueError(f"Result has no reproducibility metadata: {path}")
+        metadata = json.loads(str(payload["metadata_json"]))
+        expected_values = {
+            "schema_version": SEARCH_SCHEMA_VERSION,
+            "grid_fingerprint": grid_fingerprint(),
+            "k": k,
+            "p": p,
+            "k_index": k_index,
+            "p_index": p_index,
+        }
+        mismatches = {
+            key: (metadata.get(key), expected)
+            for key, expected in expected_values.items()
+            if metadata.get(key) != expected
+        }
+        if mismatches:
+            raise ValueError(f"Metadata mismatch in {path}: {mismatches}")
 
-    if "metadata" not in payload:
-        return _load_legacy_errors(
-            payload,
-            expected_k_index=k_index,
-            expected_p_index=p_index,
-            path=path,
-        )
-
-    metadata = payload["metadata"]
-    expected_values = {
-        "schema_version": SEARCH_SCHEMA_VERSION,
-        "grid_fingerprint": grid_fingerprint(),
-        "k": k,
-        "p": p,
-        "k_index": k_index,
-        "p_index": p_index,
-    }
-    mismatches = {
-        key: (metadata.get(key), expected)
-        for key, expected in expected_values.items()
-        if metadata.get(key) != expected
-    }
-    if mismatches:
-        raise ValueError(f"Metadata mismatch in {path}: {mismatches}")
-
-    if "mean_relative_errors" not in payload:
-        raise ValueError(f"Result has no error matrix: {path}")
-    errors = np.asarray(payload["mean_relative_errors"], dtype=np.float64)
+        if "mean_relative_errors" not in payload:
+            raise ValueError(f"Result has no error matrix: {path}")
+        errors = np.asarray(payload["mean_relative_errors"], dtype=np.float64)
     validate_error_matrix_shape(errors)
     if not np.all(np.isfinite(errors)):
         raise ValueError(f"Result contains uncomputed candidates: {path}")
     return LoadedPairErrors(
         errors=errors,
-        source_format=f"schema_{SEARCH_SCHEMA_VERSION}_pickle",
+        source_format=f"schema_{SEARCH_SCHEMA_VERSION}_npz",
         error_metric=str(metadata["error_metric"]),
         trajectory_count=int(metadata["trajectory_count"]),
         trajectory_points=int(metadata["trajectory_points"]),
@@ -324,6 +272,7 @@ def run(path: str | Path, output_dir: Path | None = None) -> list[TableIRow]:
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Aggregate the Table I DM parameter search"
     )

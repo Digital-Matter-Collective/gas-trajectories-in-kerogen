@@ -2,12 +2,11 @@ import argparse
 import csv
 import json
 import os
-import pickle
 import time
 from dataclasses import asdict, dataclass, fields
 from os.path import isfile, join
 from pathlib import Path
-from typing import Dict, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Optional, Sequence, Set, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,6 +15,7 @@ from scipy.stats import linregress
 
 from base.trajectory import Trajectory
 from base.trap_sequence import TrapSequence
+from processes.distribution_fitter import GammaFitter, WeibullFitter
 from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
     DistanceMatrixParams,
@@ -30,6 +30,7 @@ from processes.trajectory_analyzer.sib import (
 )
 from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
 from utils.cache_manifest import check_cache, file_fingerprint, write_manifest
+from utils.logging_setup import setup_logging
 from utils.types import f32
 from utils.utils import kprint
 
@@ -155,7 +156,7 @@ def save_table_iii_summary(
 
 
 def plot_trapping_on_axis(
-    ax,
+    ax: Any,
     times: np.ndarray,  # sec
     t_min: float,
     t_max: float,
@@ -276,7 +277,12 @@ def plot_trapping_on_axis(
 
 
 def plot_trap_tim_distr(
-    trap_list: list[TrapSequence], gas: str, prefix, t_min, t_max, ax1
+    trap_list: list[TrapSequence],
+    gas: str,
+    prefix: str,
+    t_min: float,
+    t_max: float,
+    ax1: Any,
 ) -> TableIIIRow:
     event_summary = summarize_trap_events(trap_list)
     time_tuple = tuple(trap.times for trap in trap_list)
@@ -289,7 +295,6 @@ def plot_trap_tim_distr(
 
     fit = plot_trapping_on_axis(ax1, non_zero_tt, t_min, t_max, prefix)
 
-    print('')
     return TableIIIRow(
         gas=gas,
         classifier=prefix,
@@ -329,31 +334,35 @@ def run(
     path_to_main: str,
     gas: str,
     step: int,
-    t_min_max,
-    ax1,
+    t_min_max: Dict[str, Tuple[float, float]],
+    ax1: Any,
     recompute_prefixes: Optional[Set[str]] = None,
 ) -> list[TableIIIRow]:
     recompute_prefixes = recompute_prefixes or set()
     traj_path = join(path_to_main, "trj.gro")
     pts_trapping = join(path_to_main, "traps")
-    path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.pkl")
-    path_to_tl_wf: str = join(path_to_main, "throat_lengths_weibull_fitter.pkl")
+    path_to_pil_gf: str = join(path_to_main, "pi_l_gamma_fitter.json")
+    path_to_tl_wf: str = join(
+        path_to_main, "throat_lengths_weibull_fitter.json"
+    )
 
     os.makedirs(pts_trapping, exist_ok=True)
 
     if isfile(path_to_pil_gf):
-        with open(path_to_pil_gf, "rb") as f:
-            pil_gamma_fitter = pickle.load(f)
+        with open(path_to_pil_gf) as f:
+            pil_gamma_fitter = GammaFitter.from_dict(json.load(f))
     else:
         raise RuntimeError("pi_l data not found")
 
     if isfile(path_to_tl_wf):
-        with open(path_to_tl_wf, "rb") as f:
-            throat_lengths_weibull_fitter = pickle.load(f)
+        with open(path_to_tl_wf) as f:
+            throat_lengths_weibull_fitter = WeibullFitter.from_dict(
+                json.load(f)
+            )
     else:
         raise RuntimeError("throat_lengths not found")
 
-    trajectories = Trajectory.read_trajectoryes(traj_path)
+    trajectories = Trajectory.read_trajectories(traj_path)
     trajectories = trajectories[::step]
 
     struct_params = get_struct_params(gas)
@@ -385,8 +394,8 @@ def run(
         trap_list = []
 
         for i, trj in enumerate(trajectories):
-            seq_file = Path(join(cur_pts, f"seq_{step * i}.pickle"))
-            traps_file = Path(join(cur_pts, f"traps_{step * i}.pickle"))
+            seq_file = Path(join(cur_pts, f"seq_{step * i}.npz"))
+            traps_file = Path(join(cur_pts, f"traps_{step * i}.npz"))
 
             analyzer_cache_metadata = {
                 "gas": gas,
@@ -432,11 +441,11 @@ def run(
 
                 start_time = time.time()
                 traps = analyzer.run(trj)
-                print(
-                    f" --- Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
+                kprint(
+                    f"Analize trajectory {i} is ready for {prefix}! Time: {time.time() - start_time}"
                 )
                 with open(traps_file, 'wb') as handle:
-                    pickle.dump(traps, handle)
+                    np.savez(handle, traps=traps)
                 write_manifest(traps_file, analyzer_cache_metadata)
             else:
                 if traps_cache_status == "legacy":
@@ -444,8 +453,8 @@ def run(
                         f"Upgrading legacy cache {traps_file} to "
                         "provenance-tracked format (trusted as-is, not recomputed)"
                     )
-                with open(traps_file, 'rb') as fp:
-                    traps = pickle.load(fp)
+                with np.load(traps_file) as data:
+                    traps = data["traps"]
                 if traps_cache_status == "legacy" or migrate_coupled_manifest:
                     write_manifest(traps_file, analyzer_cache_metadata)
 
@@ -460,12 +469,10 @@ def run(
                 and check_cache(seq_file, sequence_cache_metadata) == "match"
             )
             if use_sequence_cache:
-                with open(seq_file, 'rb') as fp:
-                    seq = pickle.load(fp)
+                seq = TrapSequence.load_npz(seq_file)
             else:
                 seq = TrapExtractor.get_trap_seq(traps, trj.delta_time_sec)
-                with open(seq_file, 'wb') as handle:
-                    pickle.dump(seq, handle)
+                seq.save_npz(seq_file)
                 write_manifest(seq_file, sequence_cache_metadata)
             results[(prefix, i)] = np.copy(traps)
 
@@ -501,6 +508,7 @@ _DEFAULT_T_MIN_MAX: Dict[str, Dict[str, Tuple[float, float]]] = {
 }
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Trap time distribution builder"
     )
@@ -555,8 +563,8 @@ if __name__ == '__main__':
     )
     summary_dir = args.summary_dir or args.path / "traps"
     csv_path, json_path = save_table_iii_summary(summary_rows, summary_dir)
-    print(f"Saved Table III summary: {csv_path}")
-    print(f"Saved Table III summary: {json_path}")
+    kprint(f"Saved Table III summary: {csv_path}")
+    kprint(f"Saved Table III summary: {json_path}")
 
     # ======================
     # Figure 1 — Survival

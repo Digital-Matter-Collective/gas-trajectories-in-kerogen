@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from processes.segmentaion import BinarizeAlgo
+from processes.segmentation import BinarizeAlgo
 from scripts.structure_image_utils import (
     build_segmentator,
     collect_processing_indexes,
@@ -15,6 +15,7 @@ from scripts.structure_image_utils import (
     load_structure,
     write_binary_file,
 )
+from utils.logging_setup import setup_logging
 
 
 def binarize_structures(
@@ -60,8 +61,9 @@ def binarize_structures(
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
-        description="Binarize extracted structure pickle files."
+        description="Binarize extracted structure .npz files."
     )
     parser.add_argument(
         "structures_dir", type=Path, help="Input structures dir"

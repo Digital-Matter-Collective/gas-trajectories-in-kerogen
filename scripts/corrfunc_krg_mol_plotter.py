@@ -1,7 +1,7 @@
 import argparse
-import pickle
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -9,6 +9,7 @@ from matplotlib.ticker import FixedFormatter, FixedLocator
 
 from base.trajectory import Trajectory
 from utils.cache_manifest import check_cache, file_fingerprint, write_manifest
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 
@@ -18,7 +19,9 @@ class RMSDResult:
     t: np.ndarray
 
 
-def extract_mean_displacement(trajectories, traj_stride: int = 1) -> RMSDResult:
+def extract_mean_displacement(
+    trajectories: List[Trajectory], traj_stride: int = 1
+) -> RMSDResult:
     a_msd = []
     a_t = []
 
@@ -108,8 +111,10 @@ def plot_corrfunc_and_md(
     plt.show()
 
 
-def plot_kerogen_molecula_coorfunc(input: Path, output: Path, msd_path: Path):
-    trajectories = Trajectory.read_trajectoryes(input)
+def plot_kerogen_molecule_corrfunc(
+    input: Path, output: Path, msd_path: Path
+) -> None:
+    trajectories = Trajectory.read_trajectories(input)
 
     msd_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -120,15 +125,15 @@ def plot_kerogen_molecula_coorfunc(input: Path, output: Path, msd_path: Path):
     }
     status = check_cache(msd_path, cache_metadata)
     if status == "match":
-        with open(msd_path, "rb") as f:
-            trj_msd = pickle.load(f)
+        with np.load(msd_path) as data:
+            trj_msd = RMSDResult(rmsd=data["rmsd"], t=data["t"])
     elif status == "legacy":
         kprint(
             f"Upgrading legacy cache {msd_path} to provenance-tracked "
             "format (trusted as-is, not recomputed)"
         )
-        with open(msd_path, "rb") as f:
-            trj_msd = pickle.load(f)
+        with np.load(msd_path) as data:
+            trj_msd = RMSDResult(rmsd=data["rmsd"], t=data["t"])
         write_manifest(msd_path, cache_metadata)
     else:
         if status == "mismatch":
@@ -139,7 +144,7 @@ def plot_kerogen_molecula_coorfunc(input: Path, output: Path, msd_path: Path):
             trajectories, traj_stride=traj_stride
         )
         with open(msd_path, "wb") as f:
-            pickle.dump(trj_msd, f)
+            np.savez(f, rmsd=trj_msd.rmsd, t=trj_msd.t)
         write_manifest(msd_path, cache_metadata)
 
     plot_corrfunc_and_md(
@@ -149,15 +154,16 @@ def plot_kerogen_molecula_coorfunc(input: Path, output: Path, msd_path: Path):
 
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser()
 
     parser.add_argument("input", type=Path, help="Input trajectory file")
     parser.add_argument("output", type=Path, help="Output figure path")
-    parser.add_argument("msd", type=Path, help="Output MSD pickle path")
+    parser.add_argument("msd", type=Path, help="Output MSD .npz path")
 
     args = parser.parse_args()
 
-    plot_kerogen_molecula_coorfunc(
+    plot_kerogen_molecule_corrfunc(
         args.input,
         args.output,
         args.msd,

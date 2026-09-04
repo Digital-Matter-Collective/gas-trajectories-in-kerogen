@@ -1,19 +1,15 @@
-import builtins
+import logging
 import re
-import sys
-from typing import Any, List, TextIO
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
-from scipy import stats
 from scipy.stats import poisson
 
-from base.boundingbox import BoundingBox
-from base.kerogendata import AtomData
 from utils.types import NPFArray
 
 
-def get_pattern_bbox():
+def get_pattern_bbox() -> "re.Pattern[str]":
     return re.compile(
         r"bbox=\("
         r"x=\((?P<x_min>[\d.]+)-(?P<x_max>[\d.]+)\)_"
@@ -23,18 +19,7 @@ def get_pattern_bbox():
     )
 
 
-def get_patter_full():
-    return re.compile(
-        r"num=(?P<step>\d+)"
-        r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)"
-        r"_bbox=\(x=\((?P<x_min>-?\d+(?:\.\d+)?)-(?P<x_max>-?\d+(?:\.\d+)?)\)"
-        r"_y=\((?P<y_min>-?\d+(?:\.\d+)?)-(?P<y_max>-?\d+(?:\.\d+)?)\)"
-        r"_z=\((?P<z_min>-?\d+(?:\.\d+)?)-(?P<z_max>-?\d+(?:\.\d+)?)\)\)"
-        r"_resolution=(?P<resolution>\d+(?:\.\d+)?)"
-    )
-
-
-def get_float_img_pattern():
+def get_float_img_pattern() -> "re.Pattern[str]":
     return re.compile(
         r"result-img-num=(?P<step>\d+)"
         r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)"
@@ -45,13 +30,9 @@ def get_float_img_pattern():
     )
 
 
-def get_pattern_num_time():
-    return re.compile(
-        r"num=(?P<step>\d+)" r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?).pickle"
-    )
-
-
-def create_empirical_cdf(vals, n=30):
+def create_empirical_cdf(
+    vals: npt.NDArray[Any], n: int = 30
+) -> npt.NDArray[np.float64]:
     p, bb = np.histogram(vals, bins=n)
     xdel = bb[1] - bb[0]
     x = (bb[:-1] + xdel * 0.5).reshape(n, 1)
@@ -106,104 +87,12 @@ def write_binary_file(array: npt.NDArray[np.int8], file_name: str) -> None:
                 file.write(bytes(bytearray(array[:, j, i])))
 
 
-def kprint(
-    *args: Any,
-    sep: str | None = " ",
-    end: str = "\n",
-    file: TextIO | None = None,
-    flush: bool = False,
-    prefix: str = " --- ",
-) -> None:
-    """
-    Полный аналог print(...) с префиксом перед сообщением.
-    - *args: любые объекты как и в print
-    - sep: разделитель между args; если None — без разделителя (как в print)
-    - end: окончание строки
-    - file: поток вывода (по умолчанию sys.stdout)
-    - flush: принудительная очистка буфера
-    - prefix: настраиваемый префикс (по умолчанию ' --- ')
-    """
-    if file is None:
-        file = sys.stdout
-
-    joiner = "" if sep is None else sep
-    body = joiner.join(map(str, args))  # как print: str() для каждого аргумента
-    builtins.print(prefix + body, end=end, file=file, flush=flush)
+_kprint_logger = logging.getLogger("kerogen")
 
 
-def create_box_mask(atoms: List[AtomData], box: BoundingBox):
-    removed_atoms = set()
-    rm_mask = np.array(range(len(atoms)), dtype=np.bool_)
-    for i, a in enumerate(atoms):
-        rm_mask[i] = box.inside_pos(a.pos)
-        if ~rm_mask[i]:
-            removed_atoms.add(i)
-    return removed_atoms, rm_mask
-
-
-def point_generation() -> npt.NDArray[np.float32]:
-    def gen_point(
-        xc: float,
-        yc: float,
-        zc: float,
-        count: int,
-        xstd: float = 0.2,
-        ystd: float = 0.2,
-        zstd: float = 0.2,
-    ) -> npt.NDArray[np.float32]:
-        points = np.zeros(shape=(count, 3), dtype=np.float32)
-        points[:, 0] = stats.norm.rvs(xc, xstd, size=count)
-        points[:, 1] = stats.norm.rvs(yc, ystd, size=count)
-        points[:, 2] = stats.norm.rvs(zc, zstd, size=count)
-        return points
-
-    x1, y1 = 0.5, 0.5
-    x2, y2 = 3.5, 3.5
-    count = 200
-    points1 = gen_point(x1, y1, 1.0, count)
-    p12 = np.array(
-        [
-            x1,
-            y1 + (y2 - y1) / 4,
-            1.0,
-            x1,
-            y1 + (y2 - y1) * 2 / 4,
-            1.0,
-            x1,
-            y1 + (y2 - y1) * 3 / 4,
-            1.0,
-        ],
-        dtype=np.float32,
-    ).reshape(3, 3)
-    points2 = gen_point(x1, y2, 1.5, count)
-    p23 = np.array(
-        [
-            x1 + (x2 - x1) / 4,
-            y2,
-            1.0,
-            x1 + (x2 - x1) * 2 / 4,
-            y2,
-            1.0,
-            x1 + (x2 - x1) * 3 / 4,
-            y2,
-            1.0,
-        ],
-        dtype=np.float32,
-    ).reshape(3, 3)
-    points3 = gen_point(x2, y2, 2.0, count)
-    p34 = np.array(
-        [
-            x2,
-            y1 + (y2 - y1) * 3 / 4,
-            1.0,
-            x2,
-            y1 + (y2 - y1) * 2 / 4,
-            1.0,
-            x2,
-            y1 + (y2 - y1) / 4,
-            1.0,
-        ],
-        dtype=np.float32,
-    ).reshape(3, 3)
-    points4 = gen_point(x2, y1, 2.5, count)
-    return np.vstack((points1, p12, points2, p23, points3, p34, points4))
+def kprint(*args: Any) -> None:
+    """print(...)-style logging: joins args with a space and logs at INFO,
+    through the standard `logging` module instead of writing to stdout
+    directly (configure handlers/level/format via
+    utils.logging_setup.setup_logging())."""
+    _kprint_logger.info(" ".join(map(str, args)))

@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Optional, Protocol, cast
+from typing import Any, Dict, Optional, Protocol, cast
 
 import numpy as np
 from scipy.stats import exponweib, gamma
@@ -23,10 +23,10 @@ class PdfFitter(Protocol):
 class WeibullFitter:
     ftype: DistributionType = DistributionType.EXPWEIB
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.params: Optional[tuple[float, float, float, float]] = None
 
-    def fit(self, data: NPFArray):
+    def fit(self, data: NPFArray) -> None:
         assert self.params is None
         # exponweib.fit возвращает (a, c, loc, scale)
         fitted = [float(v) for v in exponweib.fit(data)]
@@ -55,14 +55,25 @@ class WeibullFitter:
             NPFArray, exponweib.cdf(x, a, c, loc=loc, scale=scale).astype(f32)
         )
 
+    def to_dict(self) -> Dict[str, Any]:
+        assert self.params is not None
+        return {"ftype": self.ftype.name, "params": list(self.params)}
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WeibullFitter":
+        fitter = cls()
+        a, c, loc, scale = data["params"]
+        fitter.params = (float(a), float(c), float(loc), float(scale))
+        return fitter
+
 
 class GammaFitter:
     ftype: DistributionType = DistributionType.GAMMA
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.params: Optional[NPFArray] = None
 
-    def fit(self, data: NPFArray):
+    def fit(self, data: NPFArray) -> None:
         assert self.params is None
         self.params = gamma.fit(data)
         # x = data[:, 0]
@@ -99,3 +110,18 @@ class GammaFitter:
     def cdf(self, x: NPFArray) -> NPFArray:
         assert self.params is not None
         return cast(NPFArray, gamma.cdf(x, *self.params))
+
+    def to_dict(self) -> Dict[str, Any]:
+        assert self.params is not None
+        return {
+            "ftype": self.ftype.name,
+            "params": [float(p) for p in self.params],
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "GammaFitter":
+        fitter = cls()
+        fitter.params = np.array(
+            [float(p) for p in data["params"]], dtype=np.float64
+        )
+        return fitter

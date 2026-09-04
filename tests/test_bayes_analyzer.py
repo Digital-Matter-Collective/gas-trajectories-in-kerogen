@@ -13,7 +13,7 @@ class _ConstantFitter:
     def __init__(self, value: float) -> None:
         self.value = value
 
-    def pdf(self, x) -> np.ndarray:
+    def pdf(self, x: np.ndarray) -> np.ndarray:
         return np.full(np.asarray(x).shape, self.value, dtype=np.float64)
 
 

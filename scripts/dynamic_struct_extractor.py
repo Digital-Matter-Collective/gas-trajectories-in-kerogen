@@ -1,5 +1,4 @@
 import argparse
-import pickle
 import time
 from pathlib import Path
 
@@ -9,9 +8,11 @@ from scripts.structure_image_utils import (
     collect_indexes,
     generate_indexes_by_mode,
     kprint,
+    save_structure,
     scan_gro_trajectory_info,
     structure_file_name,
 )
+from utils.logging_setup import setup_logging
 
 
 def extract_structures(
@@ -27,7 +28,7 @@ def extract_structures(
     aindexes = np.asarray(indexes, dtype=np.int32)
     existing_mask = np.asarray(
         [
-            any(output_dir.glob(f"struct-num={num}_time-ps=*.pickle"))
+            any(output_dir.glob(f"struct-num={num}_time-ps=*.npz"))
             for num in aindexes
         ],
         dtype=bool,
@@ -47,8 +48,7 @@ def extract_structures(
         for struct in structures:
             num, time_ps, _, _ = struct
             save_path = output_dir / structure_file_name(num, time_ps)
-            with save_path.open("wb") as f:
-                pickle.dump(struct, f)
+            save_structure(save_path, struct)
 
         kprint(f"Count structures step: {i + 1} from {count_steps}")
         kprint(f"Reading finished! Elapsed time: {time.time() - start_time}s")
@@ -91,8 +91,9 @@ def build_indexes_from_args(args: argparse.Namespace) -> list[int]:
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
-        description="Extract selected structures from a .gro trajectory into pickle files."
+        description="Extract selected structures from a .gro trajectory into .npz files."
     )
     parser.add_argument("input", type=Path, help="Input .gro trajectory file")
     parser.add_argument(

@@ -1,16 +1,8 @@
-import sys
-from os.path import realpath
-from pathlib import Path
-
 from vtkmodules.vtkRenderingCore import (
     vtkRenderWindowInteractor,
 )
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from visualizer.interactor_styles import KeyPressInteractorStyle  # noqa: E402
+from visualizer.interactor_styles import KeyPressInteractorStyle
 
 
 class WinStructCollection:

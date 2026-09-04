@@ -1,7 +1,5 @@
 import argparse
-import sys
-from os.path import isfile, realpath
-from pathlib import Path
+from os.path import isfile
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
@@ -9,14 +7,14 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.trajectory import Trajectory  # noqa: E402
+from base.trajectory import Trajectory
+from utils.logging_setup import setup_logging
+from utils.utils import kprint
 
 
-def smooth(x, window_len=11, window='hanning'):
+def smooth(
+    x: np.ndarray, window_len: int = 11, window: str = 'hanning'
+) -> np.ndarray:
     """smooth the data using a window with requested size.
 
     This method is based on the convolution of a scaled window with the signal.
@@ -80,7 +78,7 @@ def runClear(
     if isfile(save_path):
         ddata = pd.read_csv(save_path)
     else:
-        trajectories = Trajectory.read_trajectoryes(traj_path)
+        trajectories = Trajectory.read_trajectories(traj_path)
         trajectories = trajectories[::step]
         nums: List[int] = []
         a_dr2: List[float] = []
@@ -101,7 +99,7 @@ def runClear(
 
 
 def runSmooth(traj_path: str, prefix: str) -> None:
-    trajectories = Trajectory.read_trajectoryes(traj_path)
+    trajectories = Trajectory.read_trajectories(traj_path)
     msd = np.zeros(shape=(trajectories[0].count_points,), dtype=np.float32)
     t = []
     wl = 20
@@ -109,7 +107,7 @@ def runSmooth(traj_path: str, prefix: str) -> None:
         dr2, t = trj.msd()
         msd += dr2
 
-    print("Time window size", t[wl] - t[0])
+    kprint("Time window size", t[wl] - t[0])
     msd /= len(trajectories)
 
     msd = smooth(msd, 20, 'flat')
@@ -118,7 +116,7 @@ def runSmooth(traj_path: str, prefix: str) -> None:
 
 
 def runAll(traj_path: str, element: str, temp: str, step: int = 1) -> None:
-    trajectories = Trajectory.read_trajectoryes(traj_path)
+    trajectories = Trajectory.read_trajectories(traj_path)
     for i, trj in enumerate(trajectories[::step]):
         dr2 = trj.msd()
         t = trj.times
@@ -135,7 +133,7 @@ def runTimeAvarage(
     if isfile(msd_path) and not force_save:
         ddata = pd.read_csv(msd_path)
     else:
-        trajectories = Trajectory.read_trajectoryes(traj_path)
+        trajectories = Trajectory.read_trajectories(traj_path)
 
         nums: List[int] = []
         a_msd: List[float] = []
@@ -170,7 +168,8 @@ def _parse_trj(s: str) -> Tuple[str, str, int]:
     return parts[0], parts[1], step
 
 
-if __name__ == '__main__':
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(description="MSD time-average builder")
     parser.add_argument(
         "--trj",
@@ -183,7 +182,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     for data_path, prefix, step in args.trj:
-        print("Run " + prefix)
+        kprint("Run " + prefix)
         traj_path = data_path + "trj.gro"
         runTimeAvarage(
             traj_path,
@@ -199,3 +198,7 @@ if __name__ == '__main__':
     plt.ylabel(r"MSD (nm$^2$)")
     plt.legend()
     plt.show()
+
+
+if __name__ == '__main__':
+    main()

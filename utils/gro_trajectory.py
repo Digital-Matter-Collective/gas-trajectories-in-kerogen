@@ -1,18 +1,17 @@
+import re
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
 from utils.utils import kprint
 
 
 class TrajectoryStepsInfo:
-    def __init__(self):
-        import re
-
+    def __init__(self) -> None:
         self.pattern = re.compile(
             r"t=\s*([0-9]+(?:\.[0-9]+)?)\s+step=\s*([0-9]+)"
         )
-        self.steps = []
-        self.times = []
+        self.steps: List[int] = []
+        self.times: List[float] = []
         self.delta = -1
 
     def get_step(self, line: str) -> None:
@@ -74,7 +73,7 @@ def filter_trajectory(
         raise ValueError("Use include_selections or exclude_resnames, not both")
 
     if skip_existing and output_path.exists():
-        print(f"Output file {output_path} already exists. Skipping.")
+        kprint(f"Output file {output_path} already exists. Skipping.")
         return info
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

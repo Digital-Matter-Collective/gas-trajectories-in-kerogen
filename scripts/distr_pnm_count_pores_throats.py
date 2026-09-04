@@ -1,19 +1,14 @@
 import argparse
-import sys
 from os import listdir
-from os.path import isfile, join, realpath
-from pathlib import Path
+from os.path import isfile, join
 from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.reader import Reader  # noqa: E402
+from base.reader import Reader
+from utils.logging_setup import setup_logging
 
 
 def build_distributions(paths: List[Tuple[str, str]]) -> None:
@@ -72,7 +67,8 @@ def _parse_trj(s: str) -> Tuple[str, str]:
     return parts[0], parts[1]
 
 
-if __name__ == '__main__':
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="PNM pore/throat count distributions"
     )
@@ -87,3 +83,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     build_distributions(args.pnm)
+
+
+if __name__ == '__main__':
+    main()

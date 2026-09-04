@@ -1,6 +1,6 @@
-import pickle
+import json
 from pathlib import Path
-from typing import cast
+from typing import Any, Dict, cast
 
 import numpy as np
 import pytest
@@ -11,7 +11,7 @@ from scripts.sim_algo_check import (
     ERROR_SERIES_COLORS,
     FIGURE_8_ANALYZERS,
     FIGURE_13_ANALYZERS,
-    _atomic_pickle_dump,
+    _atomic_savez,
     _benchmark_manifest,
     _checkpoint_metadata,
     _empty_checkpoint,
@@ -47,21 +47,21 @@ def test_trajectory_seeds_are_stable_and_independent() -> None:
     assert trajectory_seed(43, 1, 2, 3) != trajectory_seed(42, 1, 2, 3)
 
 
-def test_atomic_pickle_uses_a_separate_temporary_file(tmp_path: Path) -> None:
-    target = tmp_path / "checkpoint.pkl"
+def test_atomic_savez_uses_a_separate_temporary_file(tmp_path: Path) -> None:
+    target = tmp_path / "checkpoint.npz"
 
-    _atomic_pickle_dump({"value": 1}, target)
-    _atomic_pickle_dump({"value": 2}, target)
+    _atomic_savez(target, value=np.array(1))
+    _atomic_savez(target, value=np.array(2))
 
-    with target.open("rb") as file:
-        assert pickle.load(file) == {"value": 2}
-    assert not (tmp_path / ".checkpoint.pkl.tmp").exists()
+    with np.load(target) as data:
+        assert int(data["value"]) == 2
+    assert not (tmp_path / ".checkpoint.npz.tmp").exists()
 
 
 def test_checkpoint_resumes_from_the_next_unprocessed_trajectory(
     tmp_path: Path,
 ) -> None:
-    checkpoint_path = tmp_path / "checkpoint.pkl"
+    checkpoint_path = tmp_path / "checkpoint.npz"
     result_shape = (2, 10)
     step_count = 9
     prob_grid = np.array([0.0, 0.5])
@@ -97,7 +97,7 @@ def test_checkpoint_migrates_k_est_without_rerunning_classification(
     tmp_path: Path,
     old_version: int | None,
 ) -> None:
-    checkpoint_path = tmp_path / "checkpoint.pkl"
+    checkpoint_path = tmp_path / "checkpoint.npz"
     result_shape = (1, 1)
     step_count = 5
     metadata = _checkpoint_metadata(
@@ -131,9 +131,8 @@ def test_checkpoint_migrates_k_est_without_rerunning_classification(
     )
 
     assert restored["k_est"][0, 0] == pytest.approx(0.5)
-    with checkpoint_path.open("rb") as file:
-        migrated_payload = pickle.load(file)
-    assert migrated_payload["metadata"] == metadata
+    with np.load(checkpoint_path) as migrated_payload:
+        assert json.loads(str(migrated_payload["metadata_json"])) == metadata
 
 
 def test_seed_and_figure_contract_are_saved_without_code_fingerprint() -> None:
@@ -146,8 +145,8 @@ def test_seed_and_figure_contract_are_saved_without_code_fingerprint() -> None:
 
     assert manifest["seed"] == 42
     assert manifest["k_est_definition"] == "N_t / (N_0 + N_t)"
-    figure_8 = cast(dict, manifest["figure_8"])
-    figure_13 = cast(dict, manifest["figure_13"])
+    figure_8 = cast(Dict[str, Any], manifest["figure_8"])
+    figure_13 = cast(Dict[str, Any], manifest["figure_13"])
     assert tuple(figure_8["algorithms"]) == FIGURE_8_ANALYZERS
     assert tuple(figure_13["algorithms"]) == FIGURE_13_ANALYZERS
     assert figure_8["center"] == "mean"

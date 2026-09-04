@@ -24,17 +24,17 @@ class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
         self,
         params: NeymanPearsonParams,
         pi_l_gf: GammaFitter,
-        throat_lengthes_wf: WeibullFitter,
+        throat_lengths_wf: WeibullFitter,
     ):
         self.params = params
-        self.throat_lengthes_wf: WeibullFitter = throat_lengthes_wf
+        self.throat_lengths_wf: WeibullFitter = throat_lengths_wf
         self.pi_l_gf: GammaFitter = pi_l_gf
 
         self.transition_step_fitter: Optional[WeibullFitter] = None
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
         self.threshold = NeymanPearsonAnalyzer.calculate_threshold(
-            self.pi_l_gf, self.throat_lengthes_wf, self.params.error
+            self.pi_l_gf, self.throat_lengths_wf, self.params.error
         )
 
     @staticmethod
@@ -47,7 +47,7 @@ class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
     ) -> NPBArray:
         likelihood = self.analyze(
             trj,
-            self.throat_lengthes_wf,
+            self.throat_lengths_wf,
             self.pi_l_gf,
         )
         result = likelihood < self.threshold
@@ -81,7 +81,10 @@ class NeymanPearsonAnalyzer(TrajectoryAnalyzer):
 
     @staticmethod
     def calculate_threshold(
-        f_distr, g_distr, epsilon, x_max: float = 1.0
+        f_distr: PdfFitter,
+        g_distr: PdfFitter,
+        epsilon: float,
+        x_max: float = 1.0,
     ) -> float:
         x = np.linspace(0, x_max, 1_000_000)
         f = f_distr.pdf(x)

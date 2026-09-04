@@ -1,8 +1,21 @@
-import pickle
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import TYPE_CHECKING, Any, Iterable, Tuple
+
+import numpy as np
+import numpy.typing as npt
+
+from base.boundingbox import BoundingBox, KerogenBox
+from base.kerogendata import AtomData
+from utils.utils import kprint  # noqa: F401 (re-exported for callers)
+
+if TYPE_CHECKING:
+    from processes.segmentation import Segmentator
+
+# (num, time_ps, atoms, size) as extracted by base.reader.Reader and
+# consumed/produced by save_structure()/load_structure().
+Structure = Tuple[int, float, npt.NDArray[Any], Tuple[float, float, float]]
 
 additional_radius = 0.0
 
@@ -24,7 +37,7 @@ ext_radius = {
 }
 
 STRUCTURE_PATTERN = re.compile(
-    r"struct-num=(?P<step>\d+)" r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)\.pickle"
+    r"struct-num=(?P<step>\d+)" r"_time-ps=(?P<time_ps>\d+(?:\.\d+)?)\.npz"
 )
 
 HEADER_PATTERN = re.compile(
@@ -67,11 +80,7 @@ def get_ext_size(type_id: int) -> float:
     return ext_radius[type_id]
 
 
-def kprint(message: str) -> None:
-    print(f" --- {message}")
-
-
-def write_binary_file(array, file_name: Path) -> None:
+def write_binary_file(array: npt.NDArray[Any], file_name: Path) -> None:
     with file_name.open("wb") as file:
         for i in range(array.shape[2]):
             for j in range(array.shape[1]):
@@ -302,9 +311,7 @@ def generate_indexes_from_available_structures(
 
     available_indexes = list_available_structure_indexes(structures_dir)
     if not available_indexes:
-        raise RuntimeError(
-            f"No structure pickle files found in {structures_dir}"
-        )
+        raise RuntimeError(f"No structure .npz files found in {structures_dir}")
 
     if mode == "part":
         return available_indexes[:count_slices]
@@ -379,13 +386,13 @@ def collect_indexes(indexes: list[str], indexes_file: Path | None) -> list[int]:
 
 
 def structure_file_name(num: int, time_ps: int | float) -> str:
-    return f"struct-num={num}_time-ps={time_ps}.pickle"
+    return f"struct-num={num}_time-ps={time_ps}.npz"
 
 
 def image_base_name(
     num: int,
     time_ps: int | float,
-    bbox,
+    bbox: BoundingBox,
     resolution: float,
 ) -> str:
     return (
@@ -414,13 +421,49 @@ def iter_structure_files(
     return sorted(filenames)
 
 
-def load_structure(path: Path):
-    with path.open("rb") as f:
-        return pickle.load(f)
+def save_structure(path: Path, struct: Structure) -> None:
+    num, time_ps, atoms, size = struct
+    with path.open("wb") as f:
+        np.savez(
+            f,
+            num=np.asarray(num),
+            time_ps=np.asarray(time_ps),
+            size=np.asarray(size, dtype=np.float64),
+            struct_numbers=np.array(
+                [a.struct_number for a in atoms], dtype=np.int32
+            ),
+            struct_types=np.array([a.struct_type for a in atoms], dtype="<U8"),
+            atom_ids=np.array([a.atom_id for a in atoms], dtype="<U8"),
+            type_ids=np.array([a.type_id for a in atoms], dtype=np.int8),
+            positions=np.array([a.pos for a in atoms], dtype=np.float32),
+        )
 
 
-def extract_settings(structure, ref_size: int, dev: float):
-    from processes.segmentaion import Segmentator
+def load_structure(path: Path) -> Structure:
+    with np.load(path) as data:
+        num = int(data["num"])
+        time_ps = float(data["time_ps"])
+        size_arr = data["size"]
+        size = (float(size_arr[0]), float(size_arr[1]), float(size_arr[2]))
+        atoms = np.array(
+            [
+                AtomData(
+                    int(data["struct_numbers"][i]),
+                    str(data["struct_types"][i]),
+                    str(data["atom_ids"][i]),
+                    int(data["type_ids"][i]),
+                    data["positions"][i],
+                )
+                for i in range(len(data["struct_numbers"]))
+            ]
+        )
+    return num, time_ps, atoms, size
+
+
+def extract_settings(
+    structure: Structure, ref_size: int, dev: float
+) -> Tuple[int, float, KerogenBox, float, Tuple[int, int, int]]:
+    from processes.segmentation import Segmentator
 
     num, time_ps, atoms, size = structure
     bbox = Segmentator.cut_cell(size, dev)
@@ -432,16 +475,16 @@ def extract_settings(structure, ref_size: int, dev: float):
 
 
 def build_segmentator(
-    structure,
-    bbox,
-    img_size,
-):
+    structure: Structure,
+    bbox: BoundingBox,
+    img_size: Tuple[int, int, int],
+) -> "Segmentator":
     from base.kerogendata import KerogenData
     from base.periodizer import Periodizer
-    from processes.segmentaion import Segmentator
+    from processes.segmentation import Segmentator
 
     _, _, atoms, _ = structure
-    kerogen_data = KerogenData(None, atoms, bbox)
+    kerogen_data = KerogenData(None, list(atoms), bbox)
     if not kerogen_data.checkPeriodization():
         Periodizer.periodize(kerogen_data)
 

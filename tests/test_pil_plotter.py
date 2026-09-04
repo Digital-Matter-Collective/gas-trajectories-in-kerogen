@@ -26,12 +26,12 @@ def _make_data_dir(tmp_path: Path, n_radiuses: int = 1000) -> Path:
 
 
 def test_fit_sample_stride_subsamples_radii_before_fitting(
-    tmp_path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     data_dir = _make_data_dir(tmp_path, n_radiuses=1000)
     captured = {}
 
-    def fake_fit(sample):
+    def fake_fit(sample: np.ndarray) -> None:
         captured["size"] = len(sample)
         raise _StopAfterFit
 
@@ -54,11 +54,13 @@ def test_fit_sample_stride_subsamples_radii_before_fitting(
     assert captured["size"] == 40
 
 
-def test_fit_sample_stride_default_is_ten(tmp_path, monkeypatch) -> None:
+def test_fit_sample_stride_default_is_ten(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     data_dir = _make_data_dir(tmp_path, n_radiuses=1000)
     captured = {}
 
-    def fake_fit(sample):
+    def fake_fit(sample: np.ndarray) -> None:
         captured["size"] = len(sample)
         raise _StopAfterFit
 
@@ -79,7 +81,7 @@ def test_fit_sample_stride_default_is_ten(tmp_path, monkeypatch) -> None:
     assert captured["size"] == 100
 
 
-def test_fit_sample_stride_rejects_non_positive_values(tmp_path) -> None:
+def test_fit_sample_stride_rejects_non_positive_values(tmp_path: Path) -> None:
     data_dir = _make_data_dir(tmp_path)
 
     with pytest.raises(ValueError, match="positive integer"):

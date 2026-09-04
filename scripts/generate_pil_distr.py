@@ -1,33 +1,28 @@
 import argparse
 import json
-import pickle
-import sys
 from os import listdir
-from os.path import isfile, join, realpath
+from os.path import isfile, join
 from pathlib import Path
+from typing import Any, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
 from scipy.signal import savgol_filter
 
+from base.reader import Reader
 from processes.distribution_fitter import (
     GammaFitter,
     WeibullFitter,
 )
+from processes.pil_distr_generator import PiLDistrGenerator
 from utils.cache_manifest import check_cache, path_fingerprint, write_manifest
+from utils.logging_setup import setup_logging
 from utils.timer import Timer
 from utils.utils import kprint
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
 
-from base.reader import Reader  # noqa: E402
-from processes.pil_distr_generator import PiLDistrGenerator  # noqa: E402
-
-
-def plot_ar(ar, maxes, title, xlabel):
+def plot_ar(ar: npt.NDArray[Any], maxes: Any, title: str, xlabel: str) -> None:
     maxes.plot(ar[:, 0], ar[:, 1], label=xlabel)
     maxes.set_title(title, fontsize=12)
     maxes.set_xlabel(xlabel, fontsize=12)
@@ -35,7 +30,14 @@ def plot_ar(ar, maxes, title, xlabel):
     maxes.tick_params(axis='y', labelsize=12)
 
 
-def plot_hist(data, maxes, title, xlabel, n=50, smooth: bool = True):
+def plot_hist(
+    data: npt.NDArray[Any],
+    maxes: Any,
+    title: str,
+    xlabel: str,
+    n: int = 50,
+    smooth: bool = True,
+) -> None:
     p, bb = np.histogram(data, bins=n)
     xdel = bb[1] - bb[0]
     x = bb[:-1] + xdel * 0.5
@@ -50,9 +52,9 @@ def plot_hist(data, maxes, title, xlabel, n=50, smooth: bool = True):
     maxes.tick_params(axis='y', labelsize=12)
 
 
-def plot_distributions(path_to_pnms: str, path_to_save_pil: str):
+def plot_distributions(path_to_pnms: str, path_to_save_pil: str) -> None:
 
-    radiuses, throat_lengths = get_radiuses_lengthes(path_to_pnms)
+    radiuses, throat_lengths = get_radiuses_lengths(path_to_pnms)
 
     pi_l = np.load(path_to_save_pil + "pi_l.npy")
 
@@ -72,15 +74,17 @@ def plot_distributions(path_to_pnms: str, path_to_save_pil: str):
     plt.legend(frameon=False, prop={'size': 12})
 
 
-def get_radiuses_lengthes(path_to_pnms: str):
+def get_radiuses_lengths(
+    path_to_pnms: str,
+) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
     onlyfiles = [
         f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))
     ]
     onlyfiles = [
         join(path_to_pnms, file[:-10]) for file in onlyfiles if "_link1" in file
     ]
-    radiuses: npt.NDArray = np.array([])
-    throat_lengths: npt.NDArray = np.array([])
+    radiuses: npt.NDArray[np.float64] = np.array([])
+    throat_lengths: npt.NDArray[np.float64] = np.array([])
     for f in onlyfiles:
         r, t = Reader.read_pnm_data(f, border=0.003)
         radiuses = np.concatenate((radiuses, r))
@@ -90,22 +94,26 @@ def get_radiuses_lengthes(path_to_pnms: str):
 
 
 def save_distribution_figures(
-    path_to_save: str, radiuses: npt.NDArray, throat_lengths: npt.NDArray
-):
+    path_to_save: str,
+    radiuses: npt.NDArray[np.float64],
+    throat_lengths: npt.NDArray[np.float64],
+) -> None:
     figs_dir = Path(path_to_save) / "figs"
     figs_dir.mkdir(parents=True, exist_ok=True)
 
-    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.pkl"))
-    path_tl_wf = Path(join(path_to_save, "throat_lengths_weibull_fitter.pkl"))
+    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.json"))
+    path_tl_wf = Path(join(path_to_save, "throat_lengths_weibull_fitter.json"))
     path_pi_l_data = Path(join(path_to_save, "pi_l_data.npy"))
 
-    with open(path_pi_l_gf, "rb") as f:
-        gfitter = pickle.load(f)
-    with open(path_tl_wf, "rb") as f:
-        wfitter = pickle.load(f)
+    with open(path_pi_l_gf) as f:
+        gfitter = GammaFitter.from_dict(json.load(f))
+    with open(path_tl_wf) as f:
+        wfitter = WeibullFitter.from_dict(json.load(f))
     pi_l_data = np.load(path_pi_l_data)
 
-    def _plot_hist_and_fit(ax, data, fitter, xlabel):
+    def _plot_hist_and_fit(
+        ax: Any, data: npt.NDArray[Any], fitter: Any, xlabel: str
+    ) -> None:
         p, bb = np.histogram(data, bins=60)
         xdel = bb[1] - bb[0]
         x = bb[:-1] + xdel * 0.5
@@ -150,7 +158,7 @@ def save_distribution_figures(
 
 def generate_pil_distribution(
     path_to_pnms: str, path_to_save: str, radius_min: float
-):
+) -> None:
     path_rads = Path(join(path_to_save, "radiuses.npy"))
     path_lens = Path(join(path_to_save, "throat_lengths.npy"))
     path_units = join(path_to_save, "pnm_distribution_units.json")
@@ -175,7 +183,7 @@ def generate_pil_distribution(
             kprint(
                 f"Cache {path_rads} does not match current PNM directory; recomputing"
             )
-        radiuses, throat_lengths = get_radiuses_lengthes(path_to_pnms)
+        radiuses, throat_lengths = get_radiuses_lengths(path_to_pnms)
         np.save(path_rads, radiuses)
         np.save(path_lens, throat_lengths)
         with open(path_units, "w") as f:
@@ -188,7 +196,7 @@ def generate_pil_distribution(
 
     timer = Timer()
     timer.start()
-    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.pkl"))
+    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.json"))
     path_pi_l_data = Path(join(path_to_save, "pi_l_data.npy"))
     pi_l_metadata = {**pnm_metadata, "radius_min": radius_min}
     gfitter_status = check_cache(path_pi_l_gf, pi_l_metadata)
@@ -222,13 +230,13 @@ def generate_pil_distribution(
                 write_manifest(path_pi_l_data, pi_l_metadata)
             gfitter = GammaFitter()
             gfitter.fit(data)
-            with open(path_pi_l_gf, "wb") as f:
-                pickle.dump(gfitter, f)
+            with open(path_pi_l_gf, "w") as f:
+                json.dump(gfitter.to_dict(), f)
             write_manifest(path_pi_l_gf, pi_l_metadata)
     timer.stop("Gamma fitter")
 
     timer.start()
-    path_tl_wf = Path(join(path_to_save, "throat_lengths_weibull_fitter.pkl"))
+    path_tl_wf = Path(join(path_to_save, "throat_lengths_weibull_fitter.json"))
     tl_status = check_cache(path_tl_wf, pnm_metadata)
     if tl_status == "match":
         kprint("Using cached Weibull fitter")
@@ -245,21 +253,22 @@ def generate_pil_distribution(
             )
         wfitter = WeibullFitter()
         wfitter.fit(throat_lengths)
-        with open(path_tl_wf, "wb") as f:
-            pickle.dump(wfitter, f)
+        with open(path_tl_wf, "w") as f:
+            json.dump(wfitter.to_dict(), f)
         write_manifest(path_tl_wf, pnm_metadata)
     timer.stop("Weibull fitter")
 
     save_distribution_figures(path_to_save, radiuses, throat_lengths)
 
 
-if __name__ == '__main__':
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Generate PIL distributions from PNM data"
     )
     parser.add_argument("pnm_dir", type=Path, help="PNM directory (input)")
     parser.add_argument(
-        "output_dir", type=Path, help="Output directory for fitter pickles"
+        "output_dir", type=Path, help="Output directory for fitter JSON files"
     )
     parser.add_argument("--x-min", type=float, default=0.025)
     args = parser.parse_args()
@@ -267,3 +276,7 @@ if __name__ == '__main__':
     generate_pil_distribution(
         str(args.pnm_dir), str(args.output_dir), args.x_min
     )
+
+
+if __name__ == '__main__':
+    main()

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import networkx as nx
 import numpy as np
@@ -22,7 +22,7 @@ class AtomData:
 
 @dataclass
 class KerogenData:
-    graph: nx.Graph
+    graph: Optional[nx.Graph]
     atoms: List[AtomData]
     box: BoundingBox
 

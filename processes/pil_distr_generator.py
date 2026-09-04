@@ -6,6 +6,7 @@ from scipy.spatial.distance import pdist
 from scipy.stats import exponweib
 
 from utils.types import NPFArray, f32
+from utils.utils import kprint
 
 
 class PiLDistrGenerator:
@@ -75,7 +76,7 @@ class PiLDistrGenerator:
         n_jobs: int = 8,
         batch_size: int = 200,
         verbose_every_batches: int = 10,
-    ):
+    ) -> NPFArray:
         """
         Возвращает выборку расстояний (смесь по радиусам).
         - Для каждого радиуса генерируется k_pairs расстояний.
@@ -115,7 +116,7 @@ class PiLDistrGenerator:
             if verbose_every_batches and (
                 (bi + 1) % verbose_every_batches == 0 or (bi + 1) == nb
             ):
-                print(f"Finish batch {bi+1}/{nb} (rads: {rad_batch.size})")
+                kprint(f"Finish batch {bi+1}/{nb} (rads: {rad_batch.size})")
 
             return out.astype(f32, copy=False)
 
@@ -150,7 +151,9 @@ class PiLDistrGenerator:
         self._d_unit_sorted = d_unit
         return cast(np.ndarray, d_unit)
 
-    def get_conditional_curves(self, pore_radiuses: np.ndarray, step: int = 10):
+    def get_conditional_curves(
+        self, pore_radiuses: np.ndarray, step: int = 10
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         pore_radiuses = np.asarray(pore_radiuses, dtype=f32)
         pore_radiuses = np.sort(pore_radiuses)
 

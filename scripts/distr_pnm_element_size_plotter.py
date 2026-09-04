@@ -14,6 +14,7 @@ from scripts.structure_image_utils import (
     StepTimeMapping,
     resolve_step_time_mapping,
 )
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 
@@ -56,7 +57,9 @@ def compute_density(
     return x, pn
 
 
-def plot_fill(x, p, time_us, color):
+def plot_fill(
+    x: np.ndarray, p: np.ndarray, time_us: float, color: str
+) -> Poly3DCollection:
     verts_l = [(x, time_us, z) for x, z in zip(x, p)]
     verts_l += [(x[-1], time_us, 0.0), (x[0], time_us, 0.0)]
 
@@ -125,7 +128,7 @@ def build_3d_distributions(
         )
 
         time_us = convert_step_to_time_us(step, step_time_mapping)
-        print(f"{dataset_label}: step={step}, time={time_us:.2f} us")
+        kprint(f"{dataset_label}: step={step}, time={time_us:.2f} us")
 
         # P(l)
         x_l, p_l = compute_density(
@@ -217,7 +220,7 @@ def build_3d_distributions(
 
     xlabels = ax.get_xticklabels()
     res_xlabels = []
-    print("xlabels=", list(enumerate(xlabels)))
+    kprint("xlabels=", list(enumerate(xlabels)))
     for i, x in enumerate(xlabels):
         if i in [4, 5, 6, 7]:
             x._text = ""
@@ -270,6 +273,7 @@ def build_3d_distributions(
 
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="3D PNM element size distributions"
     )
@@ -303,7 +307,7 @@ if __name__ == '__main__':
         step_delta=args.step_delta,
         time_delta_ps=args.time_delta_ps,
     )
-    print(f"Step/time mapping: {step_time_mapping}")
+    kprint(f"Step/time mapping: {step_time_mapping}")
     build_3d_distributions(
         (str(args.pnm_dir), args.label, str(args.figs_dir)),
         step_time_mapping,

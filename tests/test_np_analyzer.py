@@ -13,7 +13,7 @@ class _ZeroFitter:
     """Fake fitter whose density is exactly zero everywhere, to exercise the
     L_T/L_C == 0 division guard directly."""
 
-    def pdf(self, x) -> np.ndarray:
+    def pdf(self, x: np.ndarray) -> np.ndarray:
         return np.zeros(np.asarray(x).shape, dtype=np.float64)
 
 
@@ -21,7 +21,7 @@ class _ConstantFitter:
     def __init__(self, value: float) -> None:
         self.value = value
 
-    def pdf(self, x) -> np.ndarray:
+    def pdf(self, x: np.ndarray) -> np.ndarray:
         return np.full(np.asarray(x).shape, self.value, dtype=np.float64)
 
 

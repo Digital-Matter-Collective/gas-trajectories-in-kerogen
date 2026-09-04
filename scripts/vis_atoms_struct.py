@@ -1,6 +1,5 @@
 import argparse
 import os
-import pickle
 from os.path import isfile, join
 from pathlib import Path
 from typing import Any, List
@@ -11,6 +10,8 @@ from scipy import ndimage
 
 from base.boundingbox import BoundingBox, Range
 from base.reader import Reader
+from scripts.structure_image_utils import load_structure, save_structure
+from utils.logging_setup import setup_logging
 from utils.utils import get_pattern_bbox
 from visualizer.visualizer import Visualizer
 
@@ -36,7 +37,7 @@ def read_and_draw_atoms_struct(
     path_to_img: str,
     index: int,
     time_ps: int,
-):
+) -> None:
     path_to_structure = join(path_to_data, "type1.ch4.300.gro")
     path_to_linked_list = join(path_to_data, "ker.pdb")
     path_to_save_structs = join(path_to_data, "structures")
@@ -44,9 +45,11 @@ def read_and_draw_atoms_struct(
     if not os.path.exists(path_to_save_structs):
         os.makedirs(path_to_save_structs, exist_ok=True)
 
-    save_struct_name = join(
-        path_to_save_structs,
-        f"struct-num={index}_time-ps={time_ps}.pickle",
+    save_struct_name = Path(
+        join(
+            path_to_save_structs,
+            f"struct-num={index}_time-ps={time_ps}.npz",
+        )
     )
     pattern = get_pattern_bbox()
     match = pattern.search(path_to_img)
@@ -57,11 +60,9 @@ def read_and_draw_atoms_struct(
     data = {k: float(v) for k, v in match.groupdict().items()}
     if not isfile(save_struct_name):
         structure = Reader.read_structures_by_num(path_to_structure, [index])[0]
-        with open(save_struct_name, 'wb') as f:
-            pickle.dump(structure, f)
+        save_structure(save_struct_name, structure)
     else:
-        with open(save_struct_name, 'rb') as f:
-            structure = pickle.load(f)
+        structure = load_structure(save_struct_name)
 
     atoms = structure[2]
 
@@ -129,6 +130,7 @@ def read_and_draw_atoms_struct(
 
 
 if "__main__" == __name__:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Visualize atom structure with image overlay"
     )

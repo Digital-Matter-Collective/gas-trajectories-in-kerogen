@@ -7,12 +7,13 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import BoundaryNorm, ListedColormap
 
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 
 def plot_kerogen_struct_slice(
     file_name: str | Path, output: Path, size: float, ref_size: Optional[float]
-):
+) -> None:
     file_path = Path(file_name)
     pattern = re.compile(
         r"result-img-num=(?P<step>\d+)"
@@ -73,6 +74,7 @@ def plot_kerogen_struct_slice(
 
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser()
 
     parser.add_argument("input", type=Path, help="Input trajectory file")

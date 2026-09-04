@@ -1,5 +1,5 @@
 import argparse
-import pickle
+import json
 import random
 import time
 from pathlib import Path
@@ -11,6 +11,7 @@ from joblib import Parallel, delayed
 from base.bufferedsampler import BufferedSampler
 from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
+from processes.distribution_fitter import WeibullFitter
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
 from processes.trajectory_analyzer.dm import DistanceMatrixAnalyzer
 from scripts.dm_parameter_search import (
@@ -24,6 +25,7 @@ from scripts.dm_parameter_search import (
     save_search_manifest,
     validate_error_matrix_shape,
 )
+from utils.logging_setup import setup_logging
 from utils.utils import create_empirical_cdf, kprint, ps_generate
 
 DEFAULT_TRAJECTORY_COUNT = 100
@@ -34,15 +36,15 @@ DEFAULT_N_JOBS = -1
 
 def _load_inputs(path_to_main: Path) -> tuple[np.ndarray, Any]:
     radiuses_path = path_to_main / "radiuses.npy"
-    throat_fitter_path = path_to_main / "throat_lengths_weibull_fitter.pkl"
+    throat_fitter_path = path_to_main / "throat_lengths_weibull_fitter.json"
     if not radiuses_path.is_file():
         raise RuntimeError(f"radiuses not found: {radiuses_path}")
     if not throat_fitter_path.is_file():
         raise RuntimeError(f"throat_lengths not found: {throat_fitter_path}")
 
     radiuses = np.load(radiuses_path)
-    with throat_fitter_path.open("rb") as file:
-        throat_fitter = pickle.load(file)
+    with throat_fitter_path.open() as file:
+        throat_fitter = WeibullFitter.from_dict(json.load(file))
     return radiuses, throat_fitter
 
 
@@ -100,35 +102,40 @@ def _load_cached_result(
     if not result_path.is_file():
         return None
 
-    with result_path.open("rb") as file:
-        payload = pickle.load(file)
-    if not isinstance(payload, dict) or "metadata" not in payload:
-        if allow_legacy:
-            kprint(f"Replace legacy result on first checkpoint: {result_path}")
-            return None
-        raise RuntimeError(
-            f"Legacy result without reproducibility metadata: {result_path}. "
-            "Rerun with --resume to replace legacy files while preserving "
-            "compatible checkpoints, or use --force-recompute to restart all."
-        )
-    if payload["metadata"] != expected_metadata:
-        raise RuntimeError(
-            f"Cached result metadata does not match this run: {result_path}. "
-            "Rerun with --force-recompute or use matching CLI parameters."
-        )
+    with np.load(result_path) as payload:
+        if "metadata_json" not in payload:
+            if allow_legacy:
+                kprint(
+                    f"Replace legacy result on first checkpoint: {result_path}"
+                )
+                return None
+            raise RuntimeError(
+                f"Legacy result without reproducibility metadata: {result_path}. "
+                "Rerun with --resume to replace legacy files while preserving "
+                "compatible checkpoints, or use --force-recompute to restart all."
+            )
+        metadata = json.loads(str(payload["metadata_json"]))
+        if metadata != expected_metadata:
+            raise RuntimeError(
+                f"Cached result metadata does not match this run: {result_path}. "
+                "Rerun with --force-recompute or use matching CLI parameters."
+            )
 
-    if "mean_relative_errors" not in payload:
-        raise RuntimeError(f"Cached result has no error matrix: {result_path}")
-    matrix = np.asarray(payload["mean_relative_errors"], dtype=np.float64)
-    completed = _completed_scale_indices(matrix)
-    recorded_completed = payload.get("completed_scale_indices")
-    if (
-        recorded_completed is not None
-        and tuple(recorded_completed) != completed
-    ):
-        raise RuntimeError(
-            f"Checkpoint completion metadata does not match its matrix: {result_path}"
-        )
+        if "mean_relative_errors" not in payload:
+            raise RuntimeError(
+                f"Cached result has no error matrix: {result_path}"
+            )
+        matrix = np.asarray(payload["mean_relative_errors"], dtype=np.float64)
+        completed = _completed_scale_indices(matrix)
+        if "completed_scale_indices" in payload:
+            recorded_completed = tuple(
+                int(v) for v in payload["completed_scale_indices"]
+            )
+            if recorded_completed != completed:
+                raise RuntimeError(
+                    "Checkpoint completion metadata does not match its "
+                    f"matrix: {result_path}"
+                )
     return matrix.copy()
 
 
@@ -139,15 +146,16 @@ def _save_checkpoint(
 ) -> None:
     completed = _completed_scale_indices(errors)
 
-    temporary_path = result_path.with_suffix(".pickle.tmp")
+    temporary_path = result_path.with_suffix(".npz.tmp")
     with temporary_path.open("wb") as file:
-        pickle.dump(
-            {
-                "metadata": metadata,
-                "mean_relative_errors": errors,
-                "completed_scale_indices": list(completed),
-            },
+        # np.savez appends ".npz" to string/Path filenames but not to an
+        # already-open file object, so this is what keeps the atomic
+        # temp-file-then-rename pattern working.
+        np.savez(
             file,
+            metadata_json=json.dumps(metadata),
+            mean_relative_errors=errors,
+            completed_scale_indices=np.array(completed, dtype=np.int64),
         )
     temporary_path.replace(result_path)
 
@@ -292,6 +300,7 @@ def run(
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Evaluate the deterministic Table I DM parameter grid"
     )

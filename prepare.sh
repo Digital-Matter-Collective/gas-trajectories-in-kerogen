@@ -18,6 +18,6 @@ echo "[4/6] Ruff check (no fixes)"
 ruff check $PYTHON_FILES
 
 echo "[5/6] mypy"
-mypy --config-file=mypy.ini .
+mypy .
 
 echo "[6/6] OK"

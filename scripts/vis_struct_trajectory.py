@@ -7,6 +7,7 @@ from scipy import ndimage
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
+from utils.logging_setup import setup_logging
 from utils.utils import get_pattern_bbox, kprint
 from visualizer.visualizer import Visualizer, WrapMode
 
@@ -82,7 +83,7 @@ def visualize_dist_trajectory(
     )
 
     traj_path = join(main_path, "trj.gro")
-    trajectories = Trajectory.read_trajectoryes(traj_path)
+    trajectories = Trajectory.read_trajectories(traj_path)
     trj = trajectories[num]
     stop_cut = stop_cut if stop_cut > 0 else trj.count_points
     trj.cut(start=start_cut, stop=stop_cut, save_dists=True)
@@ -118,6 +119,7 @@ def visualize_dist_trajectory(
 
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Visualize distance trajectory with structure image"
     )

@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from utils.gro_trajectory import TrajectoryStepsInfo, filter_trajectory
+from utils.logging_setup import setup_logging
 
 
 def run(
@@ -23,6 +24,7 @@ def run(
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Remove selected residue names from a .gro-like trajectory."
     )

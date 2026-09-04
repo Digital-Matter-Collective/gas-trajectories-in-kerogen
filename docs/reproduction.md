@@ -10,15 +10,36 @@ publication trajectory data, fitted pore-network distributions, and reference
 PNMs have not been released. Commands below can be used with compatible local
 data. The future data archive must provide the missing inputs and checksums.
 
-**Console script vs. `python -m` invocation.** Installed `gas-traj-*` console
-scripts (Section 6 onward) are reserved for the deterministic, checkpointed,
-tested commands that produce a publication Table or Figure summary; every one
-of them can equivalently be run as `python -m scripts.<module>` from an
-uninstalled checkout (see each section below). Every other executable module
-— one-off plotters, manual visual-inspection tools, and the PyMOL/VMD
-renderers under `external_scripts/` — is *only* run as `python -m
-scripts.<module>` or invoked directly with `pymol`/`vmd`, and is not wrapped
-as an installed command at all.
+**Library API vs. publication scripts.** `base/`, `processes/`, `utils/`, and
+`visualizer/` are the importable library: no CLI of their own, no filesystem
+side effects beyond what a caller asks for. Everything under `scripts/` is a
+publication script built on top of that library, and falls into two groups:
+
+- *Pipeline commands* (trajectory/structure extraction in Section 3, and
+  Sections 5 through 9): deterministic, checkpointed, tested, and produce a
+  publication Table or Figure summary (CSV/JSON next to the figure, not
+  stdout-only). All of these are registered `gas-traj-*` console scripts.
+- *One-off / exploratory tools* (Section 10 onward): manual
+  visual-inspection helpers, demo renderers, and supplementary plots not
+  part of the checkpointed, tested reproduction path. Only the ones that
+  used to need a `sys.path` hack to run directly
+  (`atom_visualization`, `simulate_trajectory`, `vis_struct_example`,
+  `msdt_builder`, `distr_pnm_connectivity`, `distr_pnm_count_pores_throats`)
+  are registered as `gas-traj-*` commands, since registering them as entry
+  points was the fix for that hack; the rest of this group (structure/PNM
+  viewers, correlation-function and power-law plotters, `pnm_extractor.py`)
+  never needed it and stayed `python -m`-only.
+
+Every registered `gas-traj-*` console script can equivalently be run as
+`python -m scripts.<module>` from an uninstalled checkout (see each section
+below).
+
+Either way, every `gas-traj-*` console script can equivalently be run as
+`python -m scripts.<module>` from an uninstalled checkout (see each section
+below). The exceptions with no installed command at all are
+`scripts/pnm_extractor.py` (needs an external, undistributed extractor
+binary) and the PyMOL/VMD renderers under `external_scripts/`, invoked
+directly with `pymol`/`vmd`.
 
 ## 1. Reference environment
 
@@ -59,8 +80,8 @@ The workflow uses this layout:
 ├── radiuses.npy
 ├── throat_lengths.npy
 ├── pi_l_data.npy
-├── pi_l_gamma_fitter.pkl
-├── throat_lengths_weibull_fitter.pkl
+├── pi_l_gamma_fitter.json
+├── throat_lengths_weibull_fitter.json
 ├── errors/
 ├── traps/
 ├── figs/
@@ -192,12 +213,12 @@ After placing PNMs under `$DATA_DIR/pnm`, generate the pore-radius,
 pore-intersection-length, and throat-length samples and fitted distributions:
 
 ```bash
-python -m scripts.generate_pil_distr \
+gas-traj-generate-pil-distr \
   "$DATA_DIR/pnm" "$DATA_DIR" --x-min 0.025
 ```
 
 This produces the `radiuses.npy`, `throat_lengths.npy`,
-`pi_l_gamma_fitter.pkl`, and `throat_lengths_weibull_fitter.pkl` inputs used
+`pi_l_gamma_fitter.json`, and `throat_lengths_weibull_fitter.json` inputs used
 by the synthetic benchmark and probabilistic trajectory analyzers.
 
 These files are caches derived from the selected PNMs. Until cache provenance
@@ -254,8 +275,8 @@ Required files at the root of `$DATA_DIR` are:
 
 ```text
 radiuses.npy
-pi_l_gamma_fitter.pkl
-throat_lengths_weibull_fitter.pkl
+pi_l_gamma_fitter.json
+throat_lengths_weibull_fitter.json
 ```
 
 Run the publication profile:
@@ -301,8 +322,8 @@ would force `k_est` towards 0.5 because those runs necessarily alternate.
 
 ## 8. Table III: trapping-time distributions
 
-Each gas dataset needs `trj.gro`, `pi_l_gamma_fitter.pkl`, and
-`throat_lengths_weibull_fitter.pkl`. Define two datasets and one shared
+Each gas dataset needs `trj.gro`, `pi_l_gamma_fitter.json`, and
+`throat_lengths_weibull_fitter.json`. Define two datasets and one shared
 summary directory:
 
 ```bash
@@ -338,8 +359,8 @@ step labels and trap sequences are stored under each dataset's `traps/DM`,
 `traps/SIB`, and `traps/HYB` directories.
 
 The event definitions for `N_t`, `N_0`, and `k_est` are the same as in the
-synthetic benchmark above. Analyzer labels (`traps_*.pickle`) and derived
-event sequences (`seq_*.pickle`) have separate provenance manifests, so a
+synthetic benchmark above. Analyzer labels (`traps_*.npz`) and derived
+event sequences (`seq_*.npz`) have separate provenance manifests, so a
 change to event encoding rebuilds only the inexpensive sequences and summary,
 not the DM/SIB/HYB classifications.
 
@@ -422,7 +443,7 @@ One kerogen molecule (single chain/residue) from a PDB:
 
 ```bash
 export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_DIR/ker.pdb' --chain A --resi 1"
-pymol -q external_scripts/visualize_kerogen_molecula.pml
+pymol -q external_scripts/visualize_kerogen_molecule.pml
 ```
 
 Full simulation cell from lattice parameters (VMD):
@@ -452,7 +473,7 @@ A cell fragment with atoms and one highlighted molecule (coordinates are in
 
 ```bash
 export PYMOL_SCRIPT_ARGS="--ker-pdb '$DATA_DIR/ker.pdb' --sim-gro '$INPUT_GRO' --frame 5 --mol-index 85 --box-size 30"
-pymol -q external_scripts/visualize_kerogen_part_cell_with_molecula.pml
+pymol -q external_scripts/visualize_kerogen_part_cell_with_molecule.pml
 ```
 
 Rotate interactively (`turn y, 45 & turn x, 15`), or pass
@@ -461,7 +482,7 @@ Rotate interactively (`turn y, 45 & turn x, 15`), or pass
 ### Structure and trajectory scripts
 
 ```bash
-python -m scripts.atom_visualization
+gas-traj-atom-legend
 ```
 
 Draws a fixed 5-atom color legend from synthetic coordinates; no arguments,
@@ -512,16 +533,16 @@ Plots the DM invariant along one trajectory with trapping regions shaded.
 displaying.
 
 ```bash
-python -m scripts.vis_traject "$DATA_DIR/trj.gro" 2 --traps "$DATA_DIR/traps/SIB/traps_2.pickle"
+python -m scripts.vis_traject "$DATA_DIR/trj.gro" 2 --traps "$DATA_DIR/traps/SIB/traps_2.npz"
 ```
 
 Displays one molecule's trajectory in 3D. `--traps` marks trap/free
-transition points using a cached `traps_<index>.pickle` classification (e.g.
+transition points using a cached `traps_<index>.npz` classification (e.g.
 written under `traps/SIB` by `gas-traj-trap-distributions`); omit it to draw
 the raw trajectory without transition markers.
 
 ```bash
-python -m scripts.vis_struct_example \
+gas-traj-vis-struct-example \
   --float_image_path "$DATA_DIR/float_images/<one-image>.npy" \
   --isovalue 0.11 --img-opacity 0.5
 ```
@@ -535,7 +556,7 @@ exploratory renderer, not the primary reproduction path for any figure.
 ### Trajectory simulation (Figure 7)
 
 ```bash
-python -m scripts.simulate_trajectory "$DATA_DIR" --k 0.5 --p 0.5 --steps 1000 --radius 0.02
+gas-traj-simulate-trajectory "$DATA_DIR" --k 0.5 --p 0.5 --steps 1000 --radius 0.02
 ```
 
 Simulates one gas-molecule trajectory with the algorithm described in the
@@ -550,7 +571,7 @@ controls the rendered trajectory tube/point size.
 python -m scripts.corrfunc_krg_mol_plotter \
   "$DATA_DIR/trj_krg/krg_99.gro" \
   "$DATA_DIR/figs/corrfunc_krg_99.svg" \
-  "$DATA_DIR/msd/krg_99.pickle"
+  "$DATA_DIR/msd/krg_99.npz"
 ```
 
 Kerogen-molecule correlation function, for one molecule extracted with
@@ -606,7 +627,7 @@ python -m scripts.complexity_estimation "$DATA_DIR" "$DATA_DIR/complexity.pdf"
 Builds the algorithm-complexity comparison plot (Figure 11).
 
 ```bash
-python -m scripts.distr_pnm_connectivity \
+gas-traj-pnm-connectivity-distr \
   --pnm "$CH4_DIR/pnm:type1-300K-CH4" \
   --pnm "$H2_DIR/pnm:type1-300K-H2"
 ```
@@ -616,7 +637,7 @@ datasets, for supplementary analysis beyond the numbered figures. The plot is
 displayed interactively and not saved to a file.
 
 ```bash
-python -m scripts.distr_pnm_count_pores_throats \
+gas-traj-pnm-pore-throat-distr \
   --pnm "$CH4_DIR/pnm:type1-300K-CH4" \
   --pnm "$H2_DIR/pnm:type1-300K-H2"
 ```
@@ -625,7 +646,7 @@ Plots pore/throat count statistics across one or more PNM datasets, same
 supplementary scope and display-only behavior as above.
 
 ```bash
-python -m scripts.msdt_builder \
+gas-traj-msdt-builder \
   --trj "$DATA_DIR:type1-300K-CH4:1" \
   --trj "${DATA_DIR/ch4/h2}:type1-300K-H2:2"
 ```
@@ -680,3 +701,49 @@ Use `gas-traj-data-manifest build --help` to set the archive identifier,
 version, creation date, and description. The manifest detects missing,
 modified, and unexpected files; it does not download data or decide which
 files are scientifically required.
+
+## 15. Performance / resource requirements
+
+None of the commands above set thread-count environment variables, so NumPy,
+SciPy, and the `@njit` kernels in `processes/trajectory_analyzer/dm.py` use
+their libraries' defaults, which is typically every visible core. Several
+commands additionally spawn their own worker pool on top of that BLAS/numba
+threading. On a shared or multi-tenant machine, cap both layers explicitly
+before running anything, e.g.:
+
+```bash
+export OMP_NUM_THREADS=4
+export OPENBLAS_NUM_THREADS=4
+export NUMBA_NUM_THREADS=4
+```
+
+and lower each command's own `--n-jobs`/`--num-workers` flag to match, or the
+two layers will oversubscribe the machine together.
+
+Per-command notes:
+
+- `gas-traj-dm-search` (§6, `errors_params.py`) and the internal `π(l)`
+  sampler in `processes/pil_distr_generator.py` parallelize with joblib
+  `Parallel`. `errors_params.py`'s `--n-jobs` defaults to `-1` (all logical
+  cores); pass a smaller value to leave headroom on a shared machine.
+- `gas-traj-binarize-structures` (§3, `binarization_structs.py`) defaults to
+  `--num-workers 4` and drives `Segmentator.binarize` in
+  `processes/segmentation.py` with the `PROCESS_CHUNK` algorithm: each worker
+  is a separate OS process, initialized once with the structure's atom
+  bounding boxes (sized by atom count, not by `--ref-size`), so raising
+  `--num-workers` mainly buys CPU parallelism rather than multiplying image
+  memory. `gas-traj-distance-maps` (`distance_map_structs.py`) runs
+  single-threaded.
+- `corrfunc_struct_plotter.py` (§11) defaults to `--num-workers 4` and uses a
+  `ThreadPoolExecutor`; each structure image is opened with
+  `np.load(..., mmap_mode="r")`, so resident memory stays close to the pages
+  actually touched rather than the full trajectory's images.
+- `gas-traj-synthetic-benchmark` (§7, `sim_algo_check.py`, Figures 8/13 and
+  Table II) is single-process and has no `--num-workers` flag. Its cost comes
+  from `DistanceMatrixAnalyzer`'s O(N²) distance-matrix computation, repeated
+  for every `(k, p, analyzer)` combination: the publication profile is 3 `k`
+  values × a 21-point `p` grid (`0.0` to `1.0` in steps of `0.05`) × up to 4
+  analyzers (DM, NP, SIB, HYB) × 100 trajectories of 3000 steps each. Expect
+  a multi-hour run on the full profile; this is why the script checkpoints
+  every `(analyzer, k)` combination to `errors/checkpoints` and supports
+  resuming instead of parallelizing.

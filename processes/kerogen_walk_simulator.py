@@ -26,22 +26,22 @@ class UnitVector3:
 
 
 class DirGenerator:
-    def __init__(self):
+    def __init__(self) -> None:
         self.ind = 0
         self.s = 100000
         self.directions = self.gen()
 
-    def gen(self):
+    def gen(self) -> NPFArray:
         dir = np.random.uniform(-1, 1, size=3 * self.s).reshape(self.s, 3)
         x = dir[:, 0]
         y = dir[:, 1]
         z = dir[:, 2]
-        lengthes = np.sqrt(x**2 + y**2 + z**2)
+        lengths = np.sqrt(x**2 + y**2 + z**2)
         for i in range(3):
-            dir[:, i] /= lengthes
+            dir[:, i] /= lengths
         return dir
 
-    def get(self):
+    def get(self) -> NPFArray:
         if self.ind >= self.s:
             self.directions = self.gen()
             self.ind = 0
@@ -55,10 +55,10 @@ class KerogenWalkSimulator:
         bs_psd: BufferedSampler,
         bs_ps: BufferedSampler,
         bs_ptl: BufferedSampler,
-        k,
-        p,
+        k: float,
+        p: float,
         with_history: bool = True,
-    ):
+    ) -> None:
         """
         :param self: Represent the instance of the class
         :param bs_psd: trap size distribution
@@ -78,8 +78,8 @@ class KerogenWalkSimulator:
         self.with_history = with_history
 
     @staticmethod
-    def gen_new_pos(cout_points, radius, pos):
-        def gen():
+    def gen_new_pos(cout_points: int, radius: float, pos: NPFArray) -> NPFArray:
+        def gen() -> NPFArray:
             mr = radius * 1.2
             cp = 4 * cout_points
             points = np.random.uniform(-mr, mr, size=3 * cp).reshape(cp, 3)
@@ -112,7 +112,7 @@ class KerogenWalkSimulator:
             points = np.vstack((points, gen()))
         return points[:(cout_points), :]
 
-    def run(self, count_points) -> Trajectory:
+    def run(self, count_points: int) -> Trajectory:
         traps = np.zeros(shape=(count_points - 1,), dtype=np.bool_)
         points = np.zeros(shape=(count_points, 3), dtype=f32)
 
@@ -122,7 +122,7 @@ class KerogenWalkSimulator:
         graph = nx.Graph()
         graph.add_node(cur_trap_ind, pos=[0, 0, 0], size=self.bs_psd.get())
 
-        def move_next(cur_pos_ind, cur_trap_ind):
+        def move_next(cur_pos_ind: int, cur_trap_ind: int) -> Tuple[int, int]:
             lenght = self.bs_ptl.get()
             dir = self.bs_dir.get()
 
@@ -154,7 +154,7 @@ class KerogenWalkSimulator:
             cur_trap_ind: int,
             ps: BufferedSampler,
             max_count_steps: int,
-        ):
+        ) -> Tuple[int, int]:
             node = graph.nodes[cur_trap_ind]
             count_steps = int(ps.get())
             if count_steps == 0:
@@ -242,4 +242,6 @@ class KerogenWalkSimulator:
         # print(f"Count move next: {count_move_next}")
         # print(f"Count move adjacent: {count_move_adj}")
         # print(f"Count iter inside: {count_iter_inside}")
-        return Trajectory(points, np.arange(count_points), bbox, traps=traps)
+        return Trajectory(
+            points, np.arange(count_points, dtype=f32), bbox, traps=traps
+        )

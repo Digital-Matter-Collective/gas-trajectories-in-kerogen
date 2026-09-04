@@ -13,6 +13,7 @@ from scripts.structure_image_utils import (
     kprint,
     load_structure,
 )
+from utils.logging_setup import setup_logging
 
 
 def build_distance_maps(
@@ -51,8 +52,9 @@ def build_distance_maps(
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
-        description="Build distance maps for extracted structure pickle files."
+        description="Build distance maps for extracted structure .npz files."
     )
     parser.add_argument(
         "structures_dir", type=Path, help="Input structures dir"

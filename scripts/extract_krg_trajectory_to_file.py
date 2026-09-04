@@ -2,11 +2,13 @@
 
 import argparse
 from pathlib import Path
+from typing import Tuple
 
 from utils.gro_trajectory import filter_trajectory as filter_gro_trajectory
+from utils.logging_setup import setup_logging
 
 
-def parse_selection(value: str):
+def parse_selection(value: str) -> Tuple[str, int]:
     """
     Parse selection in format GAS:NUM.
 
@@ -30,7 +32,8 @@ def parse_selection(value: str):
     return gas, num
 
 
-def main():
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Filter .gro-like trajectory by molecule/residue number and residue name."
     )

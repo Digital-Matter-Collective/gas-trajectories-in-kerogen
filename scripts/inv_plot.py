@@ -13,7 +13,9 @@ from processes.trajectory_analyzer.dm import (
     DistanceMatrixAnalyzer,
     DistanceMatrixParams,
 )
+from utils.logging_setup import setup_logging
 from utils.types import f32
+from utils.utils import kprint
 
 
 def _trap_segments(mask: npt.NDArray[np.bool_]) -> list[Tuple[int, int]]:
@@ -214,7 +216,7 @@ def run(
     output: Path | None,
 ) -> None:
     _validate_mu(mu)
-    trajectories = Trajectory.read_trajectoryes(trajectory_path)
+    trajectories = Trajectory.read_trajectories(trajectory_path)
     if not 0 <= trajectory_index < len(trajectories):
         raise IndexError(
             f"Trajectory index {trajectory_index} is out of range "
@@ -266,10 +268,11 @@ def run(
         filter_short_traps,
         output,
     )
-    print(f"Saved: {output}")
+    kprint(f"Saved: {output}")
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Plot the DistanceMatrix invariant for one trajectory"
     )

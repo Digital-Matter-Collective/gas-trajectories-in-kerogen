@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -39,7 +39,7 @@ class Trajectory:
         start: int = 0,
         stop: Optional[int] = None,
         save_dists: bool = False,
-    ):
+    ) -> None:
         if stop is None:
             stop = len(self.points)
 
@@ -136,7 +136,7 @@ class Trajectory:
         return self.delta_time * 1e-12
 
     @staticmethod
-    def read_trajectoryes(file_name: str | Path) -> List['Trajectory']:
+    def read_trajectories(file_name: str | Path) -> List['Trajectory']:
         ax = []
         ay = []
         az = []
@@ -275,10 +275,10 @@ class Trajectory:
 
         return trajectories
 
-    def msd(self):
+    def msd(self) -> npt.NDArray[np.float32]:
         return Trajectory.msd_by_points(self.points_without_periodic)
 
-    def msd_average_time(self):
+    def msd_average_time(self) -> npt.NDArray[np.float32]:
         points = self.points_without_periodic
         n = points.shape[0]
 
@@ -292,6 +292,46 @@ class Trajectory:
         return msd.astype(np.float32)
 
     @staticmethod
-    def msd_by_points(points):
+    def msd_by_points(
+        points: npt.NDArray[np.float32],
+    ) -> npt.NDArray[np.float32]:
         p = points - points[0, :]
-        return p[:, 0] ** 2 + p[:, 1] ** 2 + p[:, 2] ** 2
+        result: npt.NDArray[np.float32] = (
+            p[:, 0] ** 2 + p[:, 1] ** 2 + p[:, 2] ** 2
+        )
+        return result
+
+    def to_npz_arrays(self, prefix: str) -> Dict[str, Any]:
+        """Flatten into a dict of numpy arrays for one np.savez() call,
+        keyed under `prefix` (e.g. "traj_0_points", "traj_0_box_min", ...)."""
+        arrays = {
+            f"{prefix}_points": np.asarray(self.points),
+            f"{prefix}_times": np.asarray(self.times),
+            f"{prefix}_box_min": self.box.min(),
+            f"{prefix}_box_max": self.box.max(),
+            f"{prefix}_atom_size": np.asarray(self.atom_size),
+            f"{prefix}_start_dist": np.asarray(self.start_dist),
+        }
+        if self.traps is not None:
+            arrays[f"{prefix}_traps"] = np.asarray(self.traps)
+        return arrays
+
+    @staticmethod
+    def from_npz_arrays(prefix: str, data: Any) -> 'Trajectory':
+        box_min = data[f"{prefix}_box_min"]
+        box_max = data[f"{prefix}_box_max"]
+        box = BoundingBox(
+            Range(float(box_min[0]), float(box_max[0])),
+            Range(float(box_min[1]), float(box_max[1])),
+            Range(float(box_min[2]), float(box_max[2])),
+        )
+        traps_key = f"{prefix}_traps"
+        traps = np.asarray(data[traps_key]) if traps_key in data else None
+        return Trajectory(
+            points=np.asarray(data[f"{prefix}_points"]),
+            times=np.asarray(data[f"{prefix}_times"]),
+            box=box,
+            atom_size=float(data[f"{prefix}_atom_size"]),
+            traps=traps,
+            start_dist=float(data[f"{prefix}_start_dist"]),
+        )

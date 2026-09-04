@@ -26,10 +26,10 @@ class BayesAnalyzer(TrajectoryAnalyzer):
         self,
         params: BayesParams,
         pi_l_gf: GammaFitter,
-        throat_lengthes_wf: WeibullFitter,
+        throat_lengths_wf: WeibullFitter,
     ):
         self.params = params
-        self.throat_lengthes_wf: WeibullFitter = throat_lengthes_wf
+        self.throat_lengths_wf: WeibullFitter = throat_lengths_wf
         self.pi_l_gf: GammaFitter = pi_l_gf
 
         self.transition_step_fitter: Optional[WeibullFitter] = None
@@ -43,13 +43,13 @@ class BayesAnalyzer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        _, probabilityies = self.analyze(
+        _, probabilities = self.analyze(
             trj,
-            self.throat_lengthes_wf,
+            self.throat_lengths_wf,
             self.pi_l_gf,
             self.params.critical_probability,
         )
-        result = probabilityies > 0.5
+        result = probabilities > 0.5
         return result
 
     @staticmethod

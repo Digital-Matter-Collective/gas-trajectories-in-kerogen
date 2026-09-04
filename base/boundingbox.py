@@ -13,8 +13,10 @@ class Range(object):
         mmin: Optional[float] = None,
         mmax: Optional[float] = None,
     ):
-        if mmin is not None and mmax is not None:
-            assert mmin <= mmax
+        if mmin is not None and mmax is not None and mmin > mmax:
+            raise ValueError(
+                f"Range requires mmin <= mmax, got mmin={mmin}, mmax={mmax}"
+            )
         self.min_ = float(np.finfo(float).max) if mmin is None else mmin
         self.max_ = float(np.finfo(float).min) if mmax is None else mmax
 
@@ -111,8 +113,8 @@ class BoundingBox(object):
         ]:
             nb.update_by_range(b)
 
-    def aminmax(self):
-        res = []
+    def aminmax(self) -> List[float]:
+        res: List[float] = []
         for a in [self.xb_, self.yb_, self.zb_]:
             res += [a.min_, a.max_]
         return res

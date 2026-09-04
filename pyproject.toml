@@ -57,6 +57,13 @@ gas-traj-extract-krg-trajectory = "scripts.extract_krg_trajectory_to_file:main"
 gas-traj-extract-structures = "scripts.dynamic_struct_extractor:main"
 gas-traj-binarize-structures = "scripts.binarization_structs:main"
 gas-traj-distance-maps = "scripts.distance_map_structs:main"
+gas-traj-atom-legend = "scripts.atom_visualization:main"
+gas-traj-simulate-trajectory = "scripts.simulate_trajectory:main"
+gas-traj-vis-struct-example = "scripts.vis_struct_example:main"
+gas-traj-msdt-builder = "scripts.msdt_builder:main"
+gas-traj-pnm-pore-throat-distr = "scripts.distr_pnm_count_pores_throats:main"
+gas-traj-pnm-connectivity-distr = "scripts.distr_pnm_connectivity:main"
+gas-traj-generate-pil-distr = "scripts.generate_pil_distr:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -89,7 +96,7 @@ include_trailing_comma = true
 [tool.mypy]
 disallow_any_generics = true
 disallow_untyped_defs = true
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
 python_version = "3.14"
-plugins = [
-  "numpy.typing.mypy_plugin"
-]

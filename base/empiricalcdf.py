@@ -10,8 +10,10 @@ class EmpiricalCDF:
         F = cdf[:, 1].astype(f32)
 
         # минимальная валидация
-        assert np.isclose(F[-1], 1.0), "cdf[-1,1] must be 1"
-        assert np.all(np.diff(F) >= 0), "CDF must be non-decreasing"
+        if not np.isclose(F[-1], 1.0):
+            raise ValueError(f"cdf[-1,1] must be 1, got {F[-1]}")
+        if not np.all(np.diff(F) >= 0):
+            raise ValueError("CDF must be non-decreasing")
 
         self.x = x
         self.F = F

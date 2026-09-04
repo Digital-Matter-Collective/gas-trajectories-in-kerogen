@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 
@@ -27,3 +28,12 @@ class TrapSequence:
     def get_non_count_zero_steps_inside(self) -> int:
         mask = self.times == 0
         return int(np.sum(self.traps[mask]))
+
+    def save_npz(self, path: str | Path) -> None:
+        with open(path, "wb") as f:
+            np.savez(f, traps=self.traps, times=self.times)
+
+    @classmethod
+    def load_npz(cls, path: str | Path) -> "TrapSequence":
+        with np.load(path) as data:
+            return cls(traps=data["traps"], times=data["times"])

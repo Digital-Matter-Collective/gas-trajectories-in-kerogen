@@ -83,7 +83,7 @@ def test_seed_makes_simulation_reproducible() -> None:
 
             self.draws: list[float] = []
 
-        def run(self, length: int):
+        def run(self, length: int) -> _FakeTrajectory:
             import random
 
             self.draws.append(random.random())

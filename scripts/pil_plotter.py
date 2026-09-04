@@ -1,6 +1,5 @@
 import argparse
 import json
-import pickle
 from os.path import isfile, join
 from pathlib import Path
 
@@ -13,6 +12,7 @@ from scipy.stats import exponweib
 
 from processes.distribution_fitter import GammaFitter
 from processes.pil_distr_generator import PiLDistrGenerator
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 
@@ -38,7 +38,7 @@ def plot_distributions(
     heatmap_interpolation: str,
     heatmap_dpi: int,
     fit_sample_stride: int = 10,
-):
+) -> None:
     path_units = join(path_to_save, "pnm_distribution_units.json")
     if not isfile(path_units):
         raise RuntimeError("PIL distribution cache must be regenerated in nm")
@@ -82,43 +82,75 @@ def plot_distributions(
         )
     )
 
-    print("sample_rad:", sample_rad.min(), sample_rad.max(), sample_rad.shape)
-    print("l_vals:", l_vals.min(), l_vals.max(), l_vals.shape)
-    print("pi_cond shape:", pi_cond.shape)
+    kprint("sample_rad:", sample_rad.min(), sample_rad.max(), sample_rad.shape)
+    kprint("l_vals:", l_vals.min(), l_vals.max(), l_vals.shape)
+    kprint("pi_cond shape:", pi_cond.shape)
 
     positive = pi_cond[pi_cond > 0]
-    print("pi_cond min positive:", positive.min())
-    print("pi_cond max:", positive.max())
-    print("pi_cond q95:", np.quantile(positive, 0.95))
-    print("pi_cond q99:", np.quantile(positive, 0.99))
-    print("pi_cond q999:", np.quantile(positive, 0.999))
+    kprint("pi_cond min positive:", positive.min())
+    kprint("pi_cond max:", positive.max())
+    kprint("pi_cond q95:", np.quantile(positive, 0.95))
+    kprint("pi_cond q99:", np.quantile(positive, 0.99))
+    kprint("pi_cond q999:", np.quantile(positive, 0.999))
 
     imax = np.unravel_index(np.argmax(pi_cond), pi_cond.shape)
-    print("argmax pi_cond:", imax)
+    kprint("argmax pi_cond:", imax)
 
     # Если pi_cond имеет форму (len(sample_rad), len(l_vals))
     if pi_cond.shape == (len(sample_rad), len(l_vals)):
         integrals_l = np.trapezoid(pi_cond, x=l_vals, axis=1)
-        print("max at r,l:", sample_rad[imax[0]], l_vals[imax[1]])
+        kprint("max at r,l:", sample_rad[imax[0]], l_vals[imax[1]])
 
     # Если вдруг форма транспонированная
     elif pi_cond.shape == (len(l_vals), len(sample_rad)):
         integrals_l = np.trapezoid(pi_cond, x=l_vals, axis=0)
-        print("max at l,r:", l_vals[imax[0]], sample_rad[imax[1]])
+        kprint("max at l,r:", l_vals[imax[0]], sample_rad[imax[1]])
 
     else:
         raise ValueError("Unexpected pi_cond shape")
 
-    print("Integral_l min:", integrals_l.min())
-    print("Integral_l mean:", integrals_l.mean())
-    print("Integral_l max:", integrals_l.max())
-    print(
+    kprint("Integral_l min:", integrals_l.min())
+    kprint("Integral_l mean:", integrals_l.mean())
+    kprint("Integral_l max:", integrals_l.max())
+    kprint(
         "Integral_l q05/q50/q95:", np.quantile(integrals_l, [0.05, 0.5, 0.95])
     )
 
     dl = float(np.mean(np.diff(l_vals)))
-    print("dl:", dl)
-    print("max pi_cond * dl:", positive.max() * dl)
+    kprint("dl:", dl)
+    kprint("max pi_cond * dl:", positive.max() * dl)
+
+    # These fit/summary numbers were previously only ever visible via
+    # kprint; persist them next to the figures too.
+    summary_path = Path(path_to_save) / "pil_distribution_summary.json"
+    with open(summary_path, "w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "radius_fit_params": [float(p) for p in params],
+                "sample_rad_min": float(sample_rad.min()),
+                "sample_rad_max": float(sample_rad.max()),
+                "l_vals_min": float(l_vals.min()),
+                "l_vals_max": float(l_vals.max()),
+                "pi_cond_min_positive": float(positive.min()),
+                "pi_cond_max": float(positive.max()),
+                "pi_cond_q95": float(np.quantile(positive, 0.95)),
+                "pi_cond_q99": float(np.quantile(positive, 0.99)),
+                "pi_cond_q999": float(np.quantile(positive, 0.999)),
+                "integral_l_min": float(integrals_l.min()),
+                "integral_l_mean": float(integrals_l.mean()),
+                "integral_l_max": float(integrals_l.max()),
+                "integral_l_q05_q50_q95": [
+                    float(v)
+                    for v in np.quantile(integrals_l, [0.05, 0.5, 0.95])
+                ],
+                "dl": dl,
+                "max_pi_cond_times_dl": float(positive.max() * dl),
+            },
+            f,
+            indent=2,
+        )
+        f.write("\n")
+    kprint(f"Saved distribution summary: {summary_path}")
 
     kprint("sample_rad.shape: ", sample_rad.shape)
     kprint("l_vals.shape: ", l_vals.shape)
@@ -127,16 +159,16 @@ def plot_distributions(
 
     # --- fit Π(l|r) ---
 
-    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.pkl"))
+    path_pi_l_gf = Path(join(path_to_save, "pi_l_gamma_fitter.json"))
     if not path_pi_l_gf.exists():
         data = generator.gen_set(radiuses)
         gfitter = GammaFitter()
         gfitter.fit(data)
-        with open(path_pi_l_gf, "wb") as f:
-            pickle.dump(gfitter, f)
+        with open(path_pi_l_gf, "w") as f:
+            json.dump(gfitter.to_dict(), f)
     else:
-        with open(path_pi_l_gf, "rb") as f:
-            gfitter = pickle.load(f)
+        with open(path_pi_l_gf) as f:
+            gfitter = GammaFitter.from_dict(json.load(f))
         kprint("Using cached gamma fitter")
     kprint("Finish fit")
 
@@ -337,6 +369,7 @@ def plot_distributions(
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(description="Plot PIL distributions")
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument("--x-min", type=float, default=0.025)

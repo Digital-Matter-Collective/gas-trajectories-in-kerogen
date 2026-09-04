@@ -14,7 +14,10 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator, Tuple
+
+from utils.logging_setup import setup_logging
+from utils.utils import kprint
 
 MANIFEST_SCHEMA_VERSION = 1
 CHUNK_SIZE = 1 << 20
@@ -28,7 +31,9 @@ def _sha256sum(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _iter_data_files(data_dir: Path, manifest_name: str):
+def _iter_data_files(
+    data_dir: Path, manifest_name: str
+) -> Iterator[Tuple[Path, str]]:
     for path in sorted(data_dir.rglob("*")):
         if not path.is_file():
             continue
@@ -126,7 +131,7 @@ def _build_command(args: argparse.Namespace) -> None:
     path = save_manifest(
         manifest, args.data_dir, manifest_name=args.manifest_name
     )
-    print(
+    kprint(
         f"Wrote {path} ({manifest['file_count']} files, "
         f"{manifest['total_bytes']} bytes)"
     )
@@ -138,24 +143,25 @@ def _verify_command(args: argparse.Namespace) -> None:
         args.data_dir, manifest_path
     )
     if not missing and not corrupted and not unexpected:
-        print(f"OK: {args.data_dir} matches {manifest_path}")
+        kprint(f"OK: {args.data_dir} matches {manifest_path}")
         return
     if missing:
-        print(f"Missing ({len(missing)}):")
+        kprint(f"Missing ({len(missing)}):")
         for relative in missing:
-            print(f"  {relative}")
+            kprint(f"  {relative}")
     if corrupted:
-        print(f"Checksum mismatch ({len(corrupted)}):")
+        kprint(f"Checksum mismatch ({len(corrupted)}):")
         for relative in corrupted:
-            print(f"  {relative}")
+            kprint(f"  {relative}")
     if unexpected:
-        print(f"Unexpected extra files ({len(unexpected)}):")
+        kprint(f"Unexpected extra files ({len(unexpected)}):")
         for relative in unexpected:
-            print(f"  {relative}")
+            kprint(f"  {relative}")
     raise SystemExit(1)
 
 
 def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description=(
             "Build or verify a SHA-256 checksum manifest for a Zenodo data "

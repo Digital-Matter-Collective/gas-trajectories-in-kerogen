@@ -30,17 +30,17 @@ class StructureInformedBayesAnalyzer(TrajectoryAnalyzer):
         self,
         params: StructureInformedBayesParams,
         pi_l_gf: GammaFitter,
-        throat_lengthes_wf: WeibullFitter,
+        throat_lengths_wf: WeibullFitter,
     ):
         self.params = params
-        self.throat_lengthes_wf: WeibullFitter = throat_lengthes_wf
+        self.throat_lengths_wf: WeibullFitter = throat_lengths_wf
         self.pi_l_gf: GammaFitter = pi_l_gf
 
         self.transition_step_fitter: Optional[WeibullFitter] = None
         self.trapped_step_fitter: Optional[GammaFitter] = None
 
         self.threshold = NeymanPearsonAnalyzer.calculate_threshold(
-            self.pi_l_gf, self.throat_lengthes_wf, self.params.error
+            self.pi_l_gf, self.throat_lengths_wf, self.params.error
         )
 
     @staticmethod
@@ -51,20 +51,20 @@ class StructureInformedBayesAnalyzer(TrajectoryAnalyzer):
         self,
         trj: Trajectory,
     ) -> NPBArray:
-        _, probabilityies = self.analyze(trj)
-        return probabilityies > 0.5
+        _, probabilities = self.analyze(trj)
+        return probabilities > 0.5
 
     def analyze(self, trj: Trajectory) -> tuple[float, np.ndarray]:
         """Return the NP-initialized Bayesian prior and posteriors."""
         likelihood = NeymanPearsonAnalyzer.analyze(
             trj,
-            self.throat_lengthes_wf,
+            self.throat_lengths_wf,
             self.pi_l_gf,
         )
         result = (likelihood < self.threshold).astype(i32)
         return BayesAnalyzer.analyze(
             trj,
-            self.throat_lengthes_wf,
+            self.throat_lengths_wf,
             self.pi_l_gf,
             self.params.critical_probability,
             p_trap=np.sum(result) / len(result),

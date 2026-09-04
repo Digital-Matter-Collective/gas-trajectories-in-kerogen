@@ -1,5 +1,4 @@
 import json
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -31,7 +30,7 @@ from scripts.find_best_params import (
 def _loaded(errors: np.ndarray) -> LoadedPairErrors:
     return LoadedPairErrors(
         errors=errors,
-        source_format="schema_1_pickle",
+        source_format="schema_1_npz",
         error_metric="mean_relative_classification_error",
         trajectory_count=100,
         trajectory_points=1000,
@@ -121,15 +120,24 @@ def test_selection_averages_all_p_values_and_exports_table_i(
     assert csv_path.is_file()
 
 
-def test_legacy_loader_rejects_an_uncomputed_candidate(tmp_path: Path) -> None:
-    payload = {
-        (0, 0, scale_index, parameter_index): 1.0
-        for scale_index in range(CANDIDATE_SHAPE[0])
-        for parameter_index in range(CANDIDATE_SHAPE[1])
-    }
-    result_path = tmp_path / "k=0.1_p=0.0.pickle"
+def test_loader_rejects_an_uncomputed_candidate(tmp_path: Path) -> None:
+    result_path = tmp_path / "k=0.1_p=0.0.npz"
+    metadata = expected_result_metadata(
+        k=0.1,
+        p=0.0,
+        k_index=0,
+        p_index=0,
+        trajectory_count=100,
+        trajectory_points=1000,
+        seed=42,
+    )
+    errors = np.ones(CANDIDATE_SHAPE, dtype=np.float64)
     with result_path.open("wb") as file:
-        pickle.dump(payload, file)
+        np.savez(
+            file,
+            metadata_json=json.dumps(metadata),
+            mean_relative_errors=errors,
+        )
 
     loaded = load_pair_errors(
         result_path,
@@ -140,10 +148,14 @@ def test_legacy_loader_rejects_an_uncomputed_candidate(tmp_path: Path) -> None:
     )
     assert loaded.errors.shape == CANDIDATE_SHAPE
 
-    payload.pop((0, 0, CANDIDATE_SHAPE[0] - 1, CANDIDATE_SHAPE[1] - 1))
+    errors[CANDIDATE_SHAPE[0] - 1, CANDIDATE_SHAPE[1] - 1] = np.nan
     with result_path.open("wb") as file:
-        pickle.dump(payload, file)
-    with pytest.raises(ValueError, match="missing 1 candidates"):
+        np.savez(
+            file,
+            metadata_json=json.dumps(metadata),
+            mean_relative_errors=errors,
+        )
+    with pytest.raises(ValueError, match="uncomputed candidates"):
         load_pair_errors(
             result_path,
             k=0.1,
@@ -154,7 +166,7 @@ def test_legacy_loader_rejects_an_uncomputed_candidate(tmp_path: Path) -> None:
 
 
 def test_new_result_preserves_publication_metadata(tmp_path: Path) -> None:
-    result_path = tmp_path / "k=0.1_p=0.0.pickle"
+    result_path = tmp_path / "k=0.1_p=0.0.npz"
     metadata = expected_result_metadata(
         k=0.1,
         p=0.0,
@@ -165,12 +177,10 @@ def test_new_result_preserves_publication_metadata(tmp_path: Path) -> None:
         seed=42,
     )
     with result_path.open("wb") as file:
-        pickle.dump(
-            {
-                "metadata": metadata,
-                "mean_relative_errors": np.ones(CANDIDATE_SHAPE),
-            },
+        np.savez(
             file,
+            metadata_json=json.dumps(metadata),
+            mean_relative_errors=np.ones(CANDIDATE_SHAPE),
         )
 
     loaded = load_pair_errors(
@@ -188,7 +198,7 @@ def test_new_result_preserves_publication_metadata(tmp_path: Path) -> None:
 
 
 def test_scale_checkpoint_round_trip(tmp_path: Path) -> None:
-    result_path = tmp_path / "k=0.1_p=0.0.pickle"
+    result_path = tmp_path / "k=0.1_p=0.0.npz"
     metadata = expected_result_metadata(
         k=0.1,
         p=0.0,
@@ -212,15 +222,17 @@ def test_scale_checkpoint_round_trip(tmp_path: Path) -> None:
     assert _completed_scale_indices(restored) == (0,)
     np.testing.assert_array_equal(restored[0], errors[0])
     assert np.all(np.isnan(restored[1:]))
-    assert not result_path.with_suffix(".pickle.tmp").exists()
+    assert not result_path.with_suffix(".npz.tmp").exists()
 
 
 def test_resume_replaces_legacy_results_without_deleting_them_first(
     tmp_path: Path,
 ) -> None:
-    result_path = tmp_path / "k=0.1_p=0.0.pickle"
+    result_path = tmp_path / "k=0.1_p=0.0.npz"
     with result_path.open("wb") as file:
-        pickle.dump({(0, 0, 0, 0): 1.0}, file)
+        # A checkpoint written before metadata tracking existed: no
+        # "metadata_json" key.
+        np.savez(file, mean_relative_errors=np.ones(CANDIDATE_SHAPE))
     metadata = expected_result_metadata(
         k=0.1,
         p=0.0,

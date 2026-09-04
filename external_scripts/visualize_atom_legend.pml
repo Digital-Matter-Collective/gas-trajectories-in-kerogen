@@ -1,6 +1,6 @@
 # visualize_atom_legend.pml
 # Standalone PyMOL script: renders separate atom spheres with the same colors
-# as in visualize_kerogen_molecula.pml.
+# as in visualize_kerogen_molecule.pml.
 #
 # Output:
 #   ./figs/atom_legend_labeled.png      -- spheres + labels

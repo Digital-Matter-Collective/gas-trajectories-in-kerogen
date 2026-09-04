@@ -153,7 +153,7 @@ def save_search_manifest(manifest: dict[str, object], output_dir: Path) -> Path:
 
 
 def result_file_name(k: float, p: float) -> str:
-    return f"k={k}_p={p}.pickle"
+    return f"k={k}_p={p}.npz"
 
 
 def pair_seed(base_seed: int, k_index: int, p_index: int) -> int:

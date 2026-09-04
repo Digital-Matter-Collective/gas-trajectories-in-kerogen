@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol, cast
+
+import numpy as np
 
 from utils.types import NPFArray
 
@@ -17,13 +19,13 @@ class BufferedSampler:
         self.cur_index = 0
         self.cur_arr = self.source.rvs(self.size)
 
-    def get(self):
+    def get(self) -> np.floating[Any]:
         if self.cur_index >= self.size:
             self.cur_arr = self.source.rvs(self.size)
             self.cur_index = 0
         v = self.cur_arr[self.cur_index]
         self.cur_index += 1
-        return v
+        return cast("np.floating[Any]", v)
 
     def get_full(self) -> NPFArray:
         return self.source.rvs(self.size)

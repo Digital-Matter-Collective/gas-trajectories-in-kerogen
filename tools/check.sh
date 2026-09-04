@@ -17,7 +17,7 @@ echo "[3/5] black --check"
 black --check --config=pyproject.toml $PYTHON_FILES
 
 echo "[4/5] mypy"
-mypy --config-file=mypy.ini .
+mypy .
 
 echo "[5/5] pytest"
 python -m pytest -q

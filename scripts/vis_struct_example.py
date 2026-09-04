@@ -1,18 +1,13 @@
 import argparse
 import os
-import sys
-from os.path import realpath
 from pathlib import Path
 
 import numpy as np
 
-path = Path(realpath(__file__))
-parent_dir = str(path.parent.parent.absolute())
-sys.path.append(parent_dir)
-
-from base.boundingbox import BoundingBox, Range  # noqa: E402
-from utils.utils import get_float_img_pattern, kprint  # noqa: E402
-from visualizer.visualizer import Visualizer  # noqa: E402
+from base.boundingbox import BoundingBox, Range
+from utils.logging_setup import setup_logging
+from utils.utils import get_float_img_pattern, kprint
+from visualizer.visualizer import Visualizer
 
 
 def extanded_struct_extr(
@@ -55,7 +50,8 @@ def extanded_struct_extr(
     Visualizer.show()
 
 
-if __name__ == '__main__':
+def main() -> None:
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Interactively display a distance-field image as an isosurface"
     )
@@ -81,3 +77,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     extanded_struct_extr(args.float_image_path, args.isovalue, args.img_opacity)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,5 +1,4 @@
 import re
-from io import TextIOWrapper
 from typing import IO, Any, List, Optional, Tuple, cast
 
 import numpy as np
@@ -18,17 +17,21 @@ def skip_line(file: IO, count: int = 1) -> bool:  # type: ignore
 
 
 class StepsInfo:
-    def __init__(self):
+    def __init__(self) -> None:
         self.pattern = re.compile(
             r"t=\s*([0-9]+(?:\.[0-9]+)?)\s+step=\s*([0-9]+)"
         )
-        self.steps = []
-        self.times = []  # ps
+        self.steps: List[int] = []
+        self.times: List[float] = []  # ps
         self.delta = -1
 
     def get_step(self, line: str) -> None:
         match = self.pattern.search(line)
-        assert match
+        if match is None:
+            raise ValueError(
+                f"Unrecognized trajectory format: line does not match "
+                f"'t=... step=...': {line!r}"
+            )
 
         t = float(match.group(1))
         step = int(match.group(2))
@@ -45,7 +48,7 @@ class Reader:
     @staticmethod
     def read_structures_by_num(
         path_to_structure: str, indexes: List[int]
-    ) -> List[Tuple[int, int, npt.NDArray[Any], Tuple[float, float, float]]]:
+    ) -> List[Tuple[int, float, npt.NDArray[Any], Tuple[float, float, float]]]:
         structures = []
         info = StepsInfo()
         indexes_set = set(indexes)
@@ -98,7 +101,7 @@ class Reader:
                 count = int(next(f))
             splited_lines = f.readlines()
 
-            def extract_num(line: str, ind: int):
+            def extract_num(line: str, ind: int) -> str:
                 splited_line = line.split(' ')
                 splited_line = [
                     x for x in splited_line if len(x) > 0 and x != ''
@@ -122,7 +125,7 @@ class Reader:
                 count = int(next(f))
             splited_lines = f.readlines()
 
-            def extract_num(line: str, ind: int):
+            def extract_num(line: str, ind: int) -> str:
                 splited_line = line.split(' ')
                 splited_line = [
                     x for x in splited_line if len(x) > 0 and x != ''
@@ -162,19 +165,21 @@ class Reader:
         return atoms_arr, size
 
     @staticmethod
-    def read_head_struct(f, info: StepsInfo | None = None) -> Tuple[int, int]:
+    def read_head_struct(
+        f: IO[str], info: StepsInfo | None = None
+    ) -> Tuple[int, float]:
         if info is None:
             info = StepsInfo()
         try:
             simul_num = str(next(f))
             info.get_step(simul_num)
         except StopIteration:
-            return -1, -1
+            return -1, -1.0
         return info.steps[-1], info.times[-1]
 
     @staticmethod
     def read_raw_struct_ff(
-        f: TextIOWrapper,
+        f: IO[str],
     ) -> Tuple[
         Optional[npt.NDArray[Any]], Optional[Tuple[float, float, float]], int
     ]:
@@ -186,7 +191,7 @@ class Reader:
 
     @staticmethod
     def read_raw_struct_ff_main(
-        f: TextIOWrapper,
+        f: IO[str],
     ) -> Tuple[npt.NDArray[Any], Tuple[float, float, float]]:
         count_atoms = int(next(f))
         lines = [next(f) for _ in range(count_atoms)]
@@ -229,7 +234,7 @@ class Reader:
         return atoms, size
 
     @staticmethod
-    def skip_struct(f: TextIOWrapper) -> bool:
+    def skip_struct(f: IO[str]) -> bool:
         is_end = skip_line(f, 1)
         if is_end:
             return is_end
@@ -238,7 +243,7 @@ class Reader:
         return is_end
 
     @staticmethod
-    def skip_struct_main_part(f: TextIOWrapper) -> bool:
+    def skip_struct_main_part(f: IO[str]) -> bool:
         count_atoms = int(next(f))
         is_end = skip_line(f, count_atoms + 1)
         return is_end

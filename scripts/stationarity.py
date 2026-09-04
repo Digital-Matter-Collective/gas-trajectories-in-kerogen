@@ -33,11 +33,14 @@ from dataclasses import dataclass
 from os import listdir
 from os.path import isfile, join
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import matplotlib
 import numpy as np
 from scipy.stats import kstwobign
+
+from utils.logging_setup import setup_logging
+from utils.utils import kprint
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -76,7 +79,9 @@ def _select_indices(
     return sorted(set(idx))
 
 
-def _make_color_map(idx: Sequence[int]):
+def _make_color_map(
+    idx: Sequence[int],
+) -> Dict[int, Tuple[float, float, float, float]]:
     # стабильные цвета (tab10/tab20) — один и тот же idx -> один и тот же цвет
     cmap = matplotlib.colormaps[
         "tab10" if len(idx) <= 10 else "tab20"
@@ -84,7 +89,7 @@ def _make_color_map(idx: Sequence[int]):
     return {k: cmap(pos) for pos, k in enumerate(idx)}
 
 
-def _style_axes(ax):
+def _style_axes(ax: Any) -> None:
     # axis labels: bigger + bold
     ax.xaxis.label.set_size(AX_LABEL_FONTSIZE)
     ax.yaxis.label.set_size(AX_LABEL_FONTSIZE)
@@ -94,7 +99,7 @@ def _style_axes(ax):
     ax.tick_params(axis="both", which="minor", labelsize=TICK_LABEL_FONTSIZE)
 
 
-def _style_title(ax):
+def _style_title(ax: Any) -> None:
     ax.title.set_size(TITLE_FONTSIZE)
     ax.title.set_weight("normal")
 
@@ -147,7 +152,7 @@ def plot_ks_null_tail(
     drop_nan: bool = True,
     positive_only: bool = False,
     transform: Optional[str] = None,
-):
+) -> None:
     times, arrays = _prepare_arrays(
         samples,
         drop_nan=drop_nan,
@@ -382,7 +387,9 @@ def stationarity_summary_record(
     valid_p = np.isfinite(p_use)
     valid_d = np.isfinite(res.D)
 
-    def aggregate_or_none(values: np.ndarray, operation) -> float | None:
+    def aggregate_or_none(
+        values: np.ndarray, operation: Callable[[np.ndarray], Any]
+    ) -> float | None:
         finite = values[np.isfinite(values)]
         return float(operation(finite)) if finite.size else None
 
@@ -448,8 +455,8 @@ def plot_hist_overlay(
     positive_only: bool = False,
     transform: Optional[str] = None,
     idx: Optional[Sequence[int]] = None,
-    color_map: Optional[dict] = None,
-):
+    color_map: Optional[Dict[int, Tuple[float, float, float, float]]] = None,
+) -> None:
     times, arrays0 = _as_time_ordered(samples)
     arrays = []
     for a in arrays0:
@@ -527,8 +534,8 @@ def plot_ecdf_overlay(
     positive_only: bool = False,
     transform: Optional[str] = None,
     idx: Optional[Sequence[int]] = None,
-    color_map: Optional[dict] = None,
-):
+    color_map: Optional[Dict[int, Tuple[float, float, float, float]]] = None,
+) -> None:
     times, arrays = _prepare_arrays(
         samples,
         drop_nan=drop_nan,
@@ -625,7 +632,7 @@ def plot_ks_vs_time(
     *,
     title: str,
     use_adjusted_p: bool = True,
-):
+) -> None:
     pairs = res.pairs
     times = res.times
 
@@ -684,7 +691,7 @@ def plot_pairwise_heatmaps(
     transform: Optional[str] = None,
     drop_nan: bool = True,
     positive_only: bool = False,
-):
+) -> None:
     """
     Builds full pairwise matrix and plots heatmaps for D and p_adj.
     """
@@ -752,7 +759,7 @@ def run_stationarity_pipeline(
     baseline_index: int = 0,
     transform: Optional[str] = None,  # None|"log"|"log1p"
     positive_only: bool = False,
-):
+) -> Tuple["KSTestResult", "KSTestResult"]:
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
@@ -775,11 +782,19 @@ def run_stationarity_pipeline(
         positive_only=positive_only,
     )
 
-    print(
-        f"[{label}] Baseline-vs-all summary:\n{stationarity_summary(res_base, alpha=alpha)}\n"
-    )
-    print(
-        f"[{label}] Adjacent summary:\n{stationarity_summary(res_adj, alpha=alpha)}\n"
+    baseline_summary_text = stationarity_summary(res_base, alpha=alpha)
+    adjacent_summary_text = stationarity_summary(res_adj, alpha=alpha)
+    kprint(f"[{label}] Baseline-vs-all summary:\n{baseline_summary_text}\n")
+    kprint(f"[{label}] Adjacent summary:\n{adjacent_summary_text}\n")
+
+    # This narrative text is not the same content as the compact per-pair
+    # records save_stationarity_summary() writes for Table IV -- persist it
+    # too, so it is not only ever visible in the log.
+    text_summary_path = outdir / f"{label}_ks_text_summary.txt"
+    text_summary_path.write_text(
+        f"[{label}] Baseline-vs-all summary:\n{baseline_summary_text}\n\n"
+        f"[{label}] Adjacent summary:\n{adjacent_summary_text}\n",
+        encoding="utf-8",
     )
 
     # Choose representative "worst-case" pair (baseline mode) for the ECDF+D illustration
@@ -851,7 +866,7 @@ def analysis(
     pnm_dir: str,
     oputput_dir: str,
     step_time_mapping: StepTimeMapping,
-):
+) -> None:
     path_to_pnms = join(main_path, pnm_dir)
     onlyfiles = [
         f for f in listdir(path_to_pnms) if isfile(join(path_to_pnms, f))
@@ -877,7 +892,7 @@ def analysis(
 
         samples_l[time] = throat_lengths
         samples_r[time] = radiuses
-        print(f"Step: {step} Time: {time}")
+        kprint(f"Step: {step} Time: {time}")
 
     outdir = Path(main_path) / oputput_dir
     summary_records = []
@@ -939,11 +954,12 @@ def analysis(
         )
 
     csv_path, json_path = save_stationarity_summary(summary_records, outdir)
-    print(f"Saved Table IV summary: {csv_path}")
-    print(f"Saved Table IV summary: {json_path}")
+    kprint(f"Saved Table IV summary: {csv_path}")
+    kprint(f"Saved Table IV summary: {json_path}")
 
 
 if __name__ == "__main__":
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="KS-based stationarity analysis"
     )
@@ -967,7 +983,7 @@ if __name__ == "__main__":
         step_delta=args.step_delta,
         time_delta_ps=args.time_delta_ps,
     )
-    print(f"Step/time mapping: {step_time_mapping}")
+    kprint(f"Step/time mapping: {step_time_mapping}")
     analysis(
         str(args.path),
         "pnm",

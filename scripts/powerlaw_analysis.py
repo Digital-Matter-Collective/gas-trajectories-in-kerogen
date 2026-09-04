@@ -17,13 +17,14 @@ python scripts/powerlaw_analysis.py <path> --prefix SIB --mode sample \\
 
 import argparse
 import glob
+import json
 import os
-import pickle
 import re
 import warnings
+from dataclasses import asdict
 from os.path import join
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -52,6 +53,7 @@ from processes.powerlaw_fitter import (
     plc_loglik,
     vuong_test,
 )
+from utils.logging_setup import setup_logging
 from utils.utils import kprint
 
 _N_SAMPLE_SIZES: int = 20  # number of sample sizes for mode=sample
@@ -68,20 +70,20 @@ def load_trap_times(
     """
     Load all non-zero trap durations (seconds) for a given analyzer prefix.
 
-    Scans ``{path}/traps/{prefix}/seq_*.pickle`` and applies ``step``:
+    Scans ``{path}/traps/{prefix}/seq_*.npz`` and applies ``step``:
     only files whose index is a multiple of step are loaded.
     """
     traps_dir = join(path, "traps", prefix)
     if not os.path.isdir(traps_dir):
         raise RuntimeError(f"Traps directory not found: {traps_dir}")
 
-    pattern = join(traps_dir, "seq_*.pickle")
+    pattern = join(traps_dir, "seq_*.npz")
     files = glob.glob(pattern)
     if not files:
-        raise RuntimeError(f"No seq_*.pickle files found in {traps_dir}")
+        raise RuntimeError(f"No seq_*.npz files found in {traps_dir}")
 
     def _index(fp: str) -> int:
-        m = re.search(r'seq_(\d+)\.pickle$', fp)
+        m = re.search(r'seq_(\d+)\.npz$', fp)
         return int(m.group(1)) if m else -1
 
     files_sorted = sorted(files, key=_index)
@@ -90,8 +92,7 @@ def load_trap_times(
 
     parts: List[npt.NDArray[np.float64]] = []
     for fp in files_filtered:
-        with open(fp, 'rb') as fh:
-            seq: TrapSequence = pickle.load(fh)
+        seq = TrapSequence.load_npz(fp)
         t = np.asarray(seq.times, dtype=np.float64)
         parts.append(t[t > 0.0])
 
@@ -220,6 +221,14 @@ def _fit_all_at_xmin(
 # ===================================================================== #
 
 
+def save_fit_results_json(path: str, results: List[FitResult]) -> None:
+    """Persist alpha/D_pl/x_min and the rest of each FitResult as JSON,
+    since kprint only ever showed them in the log."""
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump([asdict(r) for r in results], f, indent=2)
+        f.write("\n")
+
+
 def run_xmin_mode(
     x: npt.NDArray[np.float64],
     n_xmin: int,
@@ -305,7 +314,7 @@ _COLORS = {'pl': '#1f77b4', 'exp': '#ff7f0e', 'plc': '#2ca02c'}
 _LABELS = {'pl': 'Power law', 'exp': 'Exponential', 'plc': 'PL + cutoff'}
 
 
-def _log_axis(ax):
+def _log_axis(ax: Any) -> None:
     ax.set_xscale('log')
     ax.xaxis.set_major_formatter(mticker.LogFormatterSciNotation())
     ax.xaxis.set_major_locator(mticker.LogLocator(numticks=6))
@@ -444,7 +453,9 @@ def plot_xmin_analysis(
     # ================================================================
     # [0,1] MC p-value vs x_min
     # ================================================================
-    def _pv_line(ax, arr, color, label):
+    def _pv_line(
+        ax: Any, arr: npt.NDArray[Any], color: str, label: str
+    ) -> None:
         m = np.isfinite(arr)
         if m.any():
             ax.plot(xmins_arr[m], arr[m], color=color, linewidth=2, label=label)
@@ -566,7 +577,9 @@ def plot_xmin_analysis(
     widths_all = np.diff(edges_all)
     pos_mask = counts_all > 0
 
-    def _fit_panel(ax, r, method, color, title):
+    def _fit_panel(
+        ax: Any, r: FitResult, method: str, color: str, title: str
+    ) -> None:
         xm = r.xmin
         f_tail = np.sum(x >= xm) / n_total
         x_plot = np.logspace(np.log10(xm), np.log10(x.max()), 500)
@@ -707,7 +720,7 @@ def plot_sample_analysis(
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    def _plot_line(arr, color, label):
+    def _plot_line(arr: npt.NDArray[Any], color: str, label: str) -> None:
         mask = np.isfinite(arr)
         if mask.any():
             ax.plot(
@@ -750,13 +763,14 @@ def plot_sample_analysis(
 # ===================================================================== #
 
 if __name__ == '__main__':
+    setup_logging()
     parser = argparse.ArgumentParser(
         description="Power-law analysis following Clauset et al. 2009"
     )
     parser.add_argument(
         "path",
         type=Path,
-        help="Data directory (must contain traps/<prefix>/seq_*.pickle)",
+        help="Data directory (must contain traps/<prefix>/seq_*.npz)",
     )
     parser.add_argument(
         "--prefix",
@@ -825,8 +839,13 @@ if __name__ == '__main__':
         out_svg = join(figs_out, f"powerlaw_xmin_analysis_{args.prefix}.svg")
         plot_xmin_analysis(x, results, out_svg, args.prefix)
 
+        out_json = join(figs_out, f"powerlaw_xmin_analysis_{args.prefix}.json")
+        save_fit_results_json(out_json, results)
+        kprint(f"Saved fit results: {out_json}")
+
     else:  # sample
         # Determine x_min
+        xmin_summary: Dict[str, Any] = {"xmin_source": "fixed"}
         if args.xmin is not None:
             xmin_used = args.xmin
             kprint(f"\nUsing fixed x_min = {xmin_used:.4e} s")
@@ -836,9 +855,33 @@ if __name__ == '__main__':
             kprint(
                 f"  x_min* = {xmin_used:.4e} s  alpha* = {alpha_opt:.3f}  D* = {D_opt:.4f}"
             )
+            xmin_summary = {
+                "xmin_source": "auto",
+                "x_min_star": xmin_used,
+                "alpha_star": alpha_opt,
+                "D_star": D_opt,
+            }
 
         kprint(f"\n=== Sample size sweep  (n_synth={args.n_synth}) ===")
         sample_results = run_sample_mode(x, xmin_used, args.n_synth, rng)
 
         out_svg = join(figs_out, f"powerlaw_sample_analysis_{args.prefix}.svg")
         plot_sample_analysis(sample_results, out_svg, args.prefix, xmin_used)
+
+        out_json = join(
+            figs_out, f"powerlaw_sample_analysis_{args.prefix}.json"
+        )
+        with open(out_json, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "xmin_used": xmin_used,
+                    **xmin_summary,
+                    "sample_results": [
+                        {"n": n, **asdict(r)} for n, r in sample_results
+                    ],
+                },
+                f,
+                indent=2,
+            )
+            f.write("\n")
+        kprint(f"Saved fit results: {out_json}")
