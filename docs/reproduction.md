@@ -565,6 +565,26 @@ probability parameters and `--steps` is the trajectory length; varying them
 across separate runs produces the Figure 7 b–e panel variants. `--radius`
 controls the rendered trajectory tube/point size.
 
+`gas-traj-simulate-trajectory` draws trap size and inter-trap step length
+from the fitted P(r)/P(h) distributions (`radiuses.npy`,
+`throat_lengths_weibull_fitter.json`), inventing a fresh trap on every
+exploration step. To instead walk the same trapping/return algorithm
+directly over one real PNM's actual pores and throats — trap size is the
+current pore's real radius, and the step between traps is the real throat
+length connecting them, with no independent P(r)/P(h) draw — use:
+
+```bash
+gas-traj-simulate-pnm-trajectory "$DATA_DIR/pnm/<prefix>" --k 0.5 --p 0.5 --steps 1000
+```
+
+`<prefix>` is the same PNM files prefix used elsewhere (without
+`_node1.dat` etc.). Because a real PNM is finite, once every real neighbor
+of the current pore has already been visited, the "explore further" step
+(probability `1 - p`) falls back to revisiting one of them instead of
+inventing a new trap. `--min-radius` drops pores at or below a radius
+threshold before walking, the same convention `read_pnm_data` uses
+elsewhere to filter degenerate/boundary PNM entries.
+
 ## 11. Correlation-function and PNM element-size plotting (Figures 3, 6), and power-law fit (Figure 9 / Appendix)
 
 ```bash
