@@ -585,6 +585,10 @@ inventing a new trap. `--min-radius` drops pores at or below a radius
 threshold before walking, the same convention `read_pnm_data` uses
 elsewhere to filter degenerate/boundary PNM entries.
 
+The two simulators produce the same kind of trajectory from the same `k`/`p`
+algorithm, so picking between them is a fidelity-vs-cost trade-off, not a
+correctness one — see §15 for the resource cost of each.
+
 ## 11. Correlation-function and PNM element-size plotting (Figures 3, 6), and power-law fit (Figure 9 / Appendix)
 
 ```bash
@@ -767,3 +771,23 @@ Per-command notes:
   a multi-hour run on the full profile; this is why the script checkpoints
   every `(analyzer, k)` combination to `errors/checkpoints` and supports
   resuming instead of parallelizing.
+- `gas-traj-simulate-trajectory` (§10, distribution-based) vs.
+  `gas-traj-simulate-pnm-trajectory` (§10, PNM-direct) trade fidelity for
+  cost. The distribution-based simulator never loads a PNM: each step draws
+  from a `BufferedSampler` over a pre-fit distribution (O(1), no graph
+  lookup), and its only inputs are `radiuses.npy` and a small fitted-Weibull
+  JSON — memory and per-step cost are independent of how large the source
+  PNM was. The PNM-direct simulator instead loads the *entire* PNM into an
+  in-memory `networkx.Graph` (`load_pnm_graph`) before it can take a single
+  step, and every step does a real neighbor lookup on that graph — for a
+  real PNM with many thousands of pores/throats this is both a larger
+  upfront load (networkx stores each node/edge as Python objects, far more
+  overhead per element than the flat NumPy arrays the distribution-based
+  path uses) and slower per step. Both implement the same `k`/`p`
+  trapping/return algorithm and are expected to produce statistically
+  similar trajectories; prefer the distribution-based simulator for bulk
+  synthetic generation (many trajectories, parameter sweeps — as §6 and §7
+  already do), and reach for the PNM-direct one specifically when the real
+  pore-size/throat-length correlation and finite connectivity that a fitted
+  marginal P(r)/P(h) distribution discards actually matters for the
+  question being asked.
