@@ -55,6 +55,56 @@ python -m pytest -q
 Python, NumPy, SciPy, scikit-image, BLAS, or VTK stack may change floating-point
 results, fitted parameters, image discretization, or rendering.
 
+### Reproducibility limits
+
+`environment.yml` pins exact conda build strings, not version ranges — e.g.
+`defaults::numpy=2.3.5=py314hc4ca38b_0`, `defaults::mkl=2025.0.0=hacee8c2_941`.
+The hash after the final `=` identifies one specific `linux-64` binary build.
+WSL2 runs a real Linux kernel, so Ubuntu under WSL resolves and installs the
+exact same `linux-64` build hashes as native Ubuntu — the same compiled MKL,
+NumPy, SciPy, and numba, not just a "compatible version". A native Windows
+conda install cannot do this: these `linux-64` hashes generally aren't
+available as `win-64` builds.
+
+Identical binaries on two different physical machines still do not guarantee
+bit-identical floating-point output, for reasons specific to this stack:
+
+- **MKL CPU dispatch.** MKL selects a codepath (AVX2/AVX512/SSE4/…) based on
+  the running CPU's actual instruction set. Two different physical CPUs can
+  take different codepaths for the same BLAS call, and vectorized-reduction
+  order affects float rounding at the last bit.
+- **BLAS/numba thread count is not pinned** (see §15): no script sets
+  `OMP_NUM_THREADS`/`OPENBLAS_NUM_THREADS`/`NUMBA_NUM_THREADS`, so MKL and
+  numba default to every visible core. Different machines expose different
+  core counts, which changes the parallel reduction order — and float
+  addition is not associative, so the result's last significant bits can
+  differ even with identical software.
+- **numba's `@njit` kernels compile per machine.** The DM analyzer
+  (`processes/trajectory_analyzer/dm.py`) JIT-compiles to the specific CPU
+  it runs on, fresh on every process start — on a different CPU this is
+  literally different machine code.
+
+None of this is a bug in this project; it is standard MKL/numba behavior on
+any scientific Python stack. In practice: figures, fitted parameters, and
+classification outcomes (DM/NP/Bayesian, `k_est`, etc.) are expected to
+reproduce at the level that matters scientifically across machines — the
+above affects only trailing bits, well below any threshold that would change
+a conclusion. What it rules out is a stronger claim: two different physical
+machines, even with the pinned environment, will not necessarily print the
+exact same floating-point digits.
+
+Re-running a `--seed`-accepting command (`errors_params.py`,
+`sim_algo_check.py`, `find_best_params.py`, etc.) from the same already-set-up
+`kerogen` environment **on the same machine** is as close to a bit-identical
+guarantee as this stack offers: same binaries, same CPU, same default thread
+count, same numba compilation target.
+
+`simulate_trajectory` and `simulate_pnm_trajectory` (§10) are the one
+exception where this whole discussion doesn't apply: they take no `--seed`
+and draw from unseeded global RNG state by design, so two runs differ even
+back-to-back on one machine — see the "one-off / exploratory tools" note
+above.
+
 ## 2. Dataset layout
 
 Define paths once and keep raw input separate from generated files:
