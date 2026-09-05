@@ -445,16 +445,24 @@ def load_structure(path: Path) -> Structure:
         time_ps = float(data["time_ps"])
         size_arr = data["size"]
         size = (float(size_arr[0]), float(size_arr[1]), float(size_arr[2]))
+        # NpzFile.__getitem__ re-reads and decompresses the whole array from
+        # the zip archive on every call (no caching) - read each array once
+        # here rather than once per atom, or this is O(atom_count^2).
+        struct_numbers = data["struct_numbers"]
+        struct_types = data["struct_types"]
+        atom_ids = data["atom_ids"]
+        type_ids = data["type_ids"]
+        positions = data["positions"]
         atoms = np.array(
             [
                 AtomData(
-                    int(data["struct_numbers"][i]),
-                    str(data["struct_types"][i]),
-                    str(data["atom_ids"][i]),
-                    int(data["type_ids"][i]),
-                    data["positions"][i],
+                    int(struct_numbers[i]),
+                    str(struct_types[i]),
+                    str(atom_ids[i]),
+                    int(type_ids[i]),
+                    positions[i],
                 )
-                for i in range(len(data["struct_numbers"]))
+                for i in range(len(struct_numbers))
             ]
         )
     return num, time_ps, atoms, size
