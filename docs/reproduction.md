@@ -222,6 +222,11 @@ The first command writes `.npy` binary volumes and matching headerless
 `distance_map_structs` also accepts `--mode part --count-slices N` to build a
 quick subset instead of the full run.
 
+`gas-traj-binarize-structures`'s `--num-workers` and `--ref-size` combine
+non-trivially into peak memory — see §15 before raising either on a large
+structure; if the process is OOM-killed, lower `--num-workers` and/or
+`--atom-chunk` rather than assuming the run needs more RAM than it does.
+
 ## 4. Pore-network boundary
 
 The pore-network extractor used by the authors is not distributed. The local
@@ -804,9 +809,22 @@ Per-command notes:
   `--num-workers 4` and drives `Segmentator.binarize` in
   `processes/segmentation.py` with the `PROCESS_CHUNK` algorithm: each worker
   is a separate OS process, initialized once with the structure's atom
-  bounding boxes (sized by atom count, not by `--ref-size`), so raising
-  `--num-workers` mainly buys CPU parallelism rather than multiplying image
-  memory. `gas-traj-distance-maps` (`distance_map_structs.py`) runs
+  bounding boxes (sized by atom count, not by `--ref-size`). That one-time
+  broadcast is cheap, but raising `--num-workers` *does* roughly multiply
+  peak memory, because each worker computes one image slice at a time via
+  `scipy.spatial.distance.cdist(pos_in, atoms_in_chunk)` — a dense
+  `len(pos_in) × --atom-chunk` `float64` matrix, and `len(pos_in)` can be up
+  to the full slice cross-section (`Ny·Nz`, roughly `--ref-size²`) when a
+  structure's atoms span most of a bounding-box partition. With `N` workers
+  computing slices concurrently, peak resident memory is on the order of
+  `N × ref_size² × atom_chunk × 9` bytes (the `float64` distance matrix plus
+  its boolean comparison result) — quadratic in `--ref-size`, not the
+  `--ref-size³ × 1 byte` a glance at the output image's shape/dtype would
+  suggest. `--atom-chunk` (default `1024`) trades this off directly: halving
+  it roughly halves peak memory per worker at some CPU cost, independent of
+  `--num-workers`. If a run is OOM-killed, lower `--num-workers` first
+  (linear effect on peak memory) and/or `--atom-chunk` for large
+  `--ref-size`. `gas-traj-distance-maps` (`distance_map_structs.py`) runs
   single-threaded.
 - `corrfunc_struct_plotter.py` (§11) defaults to `--num-workers 4` and uses a
   `ThreadPoolExecutor`; each structure image is opened with

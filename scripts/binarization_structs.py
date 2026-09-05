@@ -26,6 +26,7 @@ def binarize_structures(
     ref_size: int,
     dev: float,
     num_workers: int,
+    atom_chunk: int,
 ) -> None:
     output_bin_dir.mkdir(parents=True, exist_ok=True)
     output_raw_dir.mkdir(parents=True, exist_ok=True)
@@ -51,7 +52,9 @@ def binarize_structures(
         kprint(f"Run binarization for num={num}")
         start_time = time.time()
         img = 1 - segmentator.binarize(
-            num_workers=num_workers, algo=BinarizeAlgo.PROCESS_CHUNK
+            num_workers=num_workers,
+            atom_chunk=atom_chunk,
+            algo=BinarizeAlgo.PROCESS_CHUNK,
         )
         np.save(binarized_path, img)
         write_binary_file(img, raw_path)
@@ -99,6 +102,18 @@ def main() -> None:
     parser.add_argument("--dev", type=float, default=2.0)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument(
+        "--atom-chunk",
+        type=int,
+        default=1024,
+        help=(
+            "Atoms per pairwise-distance batch inside each worker. Peak "
+            "memory per concurrent slice is roughly "
+            "ref_size^2 * atom_chunk * 9 bytes, so lowering this trades "
+            "speed for memory instead of lowering --num-workers (see "
+            "docs/reproduction.md sec. 15)."
+        ),
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print selected indexes and exit without binarization.",
@@ -135,6 +150,7 @@ def main() -> None:
         ref_size=args.ref_size,
         dev=args.dev,
         num_workers=args.num_workers,
+        atom_chunk=args.atom_chunk,
     )
 
 
