@@ -32,14 +32,15 @@ publication script built on top of that library, and falls into two groups:
 
 Every registered `gas-traj-*` console script can equivalently be run as
 `python -m scripts.<module>` from an uninstalled checkout (see each section
-below).
-
-Either way, every `gas-traj-*` console script can equivalently be run as
-`python -m scripts.<module>` from an uninstalled checkout (see each section
 below). The exceptions with no installed command at all are
 `scripts/pnm_extractor.py` (needs an external, undistributed extractor
 binary) and the PyMOL/VMD renderers under `external_scripts/`, invoked
 directly with `pymol`/`vmd`.
+
+The examples below show publication-oriented invocations. The
+[command-line parameter reference](cli-reference.md) describes every
+positional argument and option accepted by every Python, PyMOL, and VMD script,
+including defaults, units, repeatability, and mutually exclusive flags.
 
 ## 1. Reference environment
 
@@ -270,7 +271,23 @@ pore-intersection-length, and throat-length samples and fitted distributions:
 ```bash
 gas-traj-generate-pil-distr \
   "$DATA_DIR/pnm" "$DATA_DIR" --x-min 0.025
+
+# Without installing the package (run from the repository root):
+python -m scripts.generate_pil_distr \
+  "$DATA_DIR/pnm" "$DATA_DIR" --x-min 0.025
 ```
+
+Command-line parameters:
+
+| Parameter | Required | Description |
+|---|---|---|
+| `pnm_dir` | yes | Input directory containing the Statoil-format PNM files. Files belonging to one network must share a prefix and include `<prefix>_node2.dat` and `<prefix>_link1.dat`. The example uses `$DATA_DIR/pnm`. |
+| `output_dir` | yes | Existing directory in which the generated NumPy samples, fitted-distribution JSON files, cache-provenance metadata, and the `figs/` directory are written. The example uses `$DATA_DIR`. |
+| `--x-min FLOAT` | no | Minimum pore radius in nm used to generate and fit the pore-intersection-length sample. Only radii strictly greater than this value are included. The default is `0.025`; the raw `radiuses.npy` cache and the throat-length fit are not filtered by this option. |
+| `-h`, `--help` | no | Print the command-line help and exit without fitting distributions. |
+
+The two positional parameters must be given in the order shown above. The
+installed command and the `python -m` form accept exactly the same parameters.
 
 This produces the `radiuses.npy`, `throat_lengths.npy`,
 `pi_l_gamma_fitter.json`, and `throat_lengths_weibull_fitter.json` inputs used
@@ -483,10 +500,9 @@ manual step in the Figures 1, 2, 4, 7, and 10 workflow.
 ### PyMOL and VMD renderers (`external_scripts/`)
 
 PyMOL and VMD are not part of `environment.yml` and must be installed
-separately. Every script under `external_scripts/` reads its arguments from
-an environment variable instead of CLI flags: PyMOL scripts read
-`PYMOL_SCRIPT_ARGS` (shlex-split), VMD scripts read `VMD_SCRIPT_ARGS`
-(whitespace-split).
+separately. PyMOL scripts read `PYMOL_SCRIPT_ARGS` (shlex-split). VMD scripts
+accept arguments after `-args` and fall back to `VMD_SCRIPT_ARGS`
+(whitespace-split); use `-args` when one option value itself contains spaces.
 
 Atom color legend:
 
@@ -504,8 +520,9 @@ pymol -q external_scripts/visualize_kerogen_molecule.pml
 Full simulation cell from lattice parameters (VMD):
 
 ```bash
-export VMD_SCRIPT_ARGS="--ker-pdb '$DATA_DIR/ker.pdb' --cell '62.309 74.106 130.150 90 90 90'"
-vmd -e external_scripts/visualize_kerogen_cell.tcl
+vmd -e external_scripts/visualize_kerogen_cell.tcl -args \
+  --ker-pdb "$DATA_DIR/ker.pdb" \
+  --cell "62.309 74.106 130.150 90 90 90"
 ```
 
 A cell fragment without atoms, from an explicit subbox or a `--box-size` cube
@@ -726,8 +743,8 @@ supplementary scope and display-only behavior as above.
 
 ```bash
 gas-traj-msdt-builder \
-  --trj "$DATA_DIR:type1-300K-CH4:1" \
-  --trj "${DATA_DIR/ch4/h2}:type1-300K-H2:2"
+  --trj "$CH4_DIR/:type1-300K-CH4:1" \
+  --trj "$H2_DIR/:type1-300K-H2:2"
 ```
 
 Plots the time-averaged mean-square displacement (log-log) for one or more
@@ -776,10 +793,11 @@ python -m scripts.build_data_release_manifest build "$DATA_DIR"
 python -m scripts.build_data_release_manifest verify "$DATA_DIR"
 ```
 
-Use `gas-traj-data-manifest build --help` to set the archive identifier,
-version, creation date, and description. The manifest detects missing,
-modified, and unexpected files; it does not download data or decide which
-files are scientifically required.
+Use `gas-traj-data-manifest build --help` to set the data license, code URL
+and version, description, and manifest filename. The UTC creation timestamp is
+generated automatically. The manifest detects missing, modified, and
+unexpected files; it does not download data or decide which files are
+scientifically required.
 
 ## 15. Performance / resource requirements
 

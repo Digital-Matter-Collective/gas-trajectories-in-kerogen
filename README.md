@@ -147,7 +147,10 @@ sequence, publication profiles, expected file layout, and figure/table mapping
 are documented in [`docs/reproduction.md`](docs/reproduction.md). That guide
 also states the console-script-vs-`python -m` convention and documents the
 remaining manual/visualization scripts under `scripts/` and the PyMOL/VMD
-renderers under `external_scripts/`, which are not installed as commands.
+renderers under `external_scripts/`, which are not installed as commands. A
+description of every positional argument and option, including defaults and
+units, is in the
+[`command-line parameter reference`](docs/cli-reference.md).
 
 ### Manual and visualization scripts
 
