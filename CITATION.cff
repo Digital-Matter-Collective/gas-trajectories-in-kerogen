@@ -1,22 +1,57 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: >-
+  If you use this software, please cite this software release. If you also use
+  the accompanying research data, cite the dataset separately as described in
+  the README.
 type: software
 title: gas-trajectories-in-kerogen
 abstract: >-
   Trajectory analysis of gas molecules in kerogen pore structures: trapping-event
   classification (distance-matrix, Neyman-Pearson, Bayesian and hybrid analyzers),
   pore-network-model statistics, and the synthetic benchmarks used to validate them.
-version: 0.0.1
+version: 1.0.0
+date-released: "2026-09-04"
+doi: "10.5281/zenodo.22309112"
 authors:
   - family-names: Ananev
     given-names: Andrey
+    orcid: "https://orcid.org/0009-0001-3076-5915"
   - family-names: Potapova
     given-names: Maria
+    orcid: "https://orcid.org/0009-0000-2858-0631"
   - family-names: Vostroknutov
     given-names: Timur
+    orcid: "https://orcid.org/0009-0003-3457-8767"
   - family-names: Kondratyuk
     given-names: Nikolay
+    orcid: "https://orcid.org/0000-0002-8286-0447"
   - family-names: Khlyupin
     given-names: Aleksey
+    orcid: "https://orcid.org/0000-0002-6686-7243"
 repository-code: "https://github.com/Digital-Matter-Collective/gas-trajectories-in-kerogen"
+url: "https://doi.org/10.5281/zenodo.22309112"
 license: MIT
+
+# After the accompanying article is published, uncomment the block below and
+# replace its placeholder values. Put the bare article DOI in `doi` (without
+# the https://doi.org/ prefix). `preferred-citation` tells GitHub and citation
+# tools that the article is the preferred scholarly citation for this software.
+# Also update `message` above if users should cite both the article and the
+# archived software release.
+# preferred-citation:
+#   type: article
+#   title: "ARTICLE TITLE"
+#   authors:
+#     - family-names: Ananev
+#       given-names: Andrey
+#     - family-names: Potapova
+#       given-names: Maria
+#     - family-names: Vostroknutov
+#       given-names: Timur
+#     - family-names: Kondratyuk
+#       given-names: Nikolay
+#     - family-names: Khlyupin
+#       given-names: Aleksey
+#   journal: "JOURNAL TITLE"
+#   year: PUBLICATION_YEAR
+#   doi: "10.xxxx/ARTICLE_DOI"

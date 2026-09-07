@@ -32,14 +32,14 @@ not a remote attacker.
 
 ### Deserialization of untrusted data
 
-`pickle.load` can execute arbitrary code for a maliciously crafted payload,
-so it must never be used on a path a user (or a script downstream of one)
-can point at untrusted data. As of the pickle→safe-format migration
-(commit `94b32c7`), every first-party cache, checkpoint, and intermediate
-result in this repository — trap sequences, fitted distribution parameters,
-extracted MD structures, benchmark checkpoints — is written and read as
-`.npz`/`.npy` (NumPy's array format) or JSON instead of `pickle`. Neither
-format can execute code on load.
+`pickle.load` can execute arbitrary code from a maliciously crafted payload,
+so it must never be used with a path that a user (or a downstream script) can
+point to untrusted data. Since the migration away from `pickle`, every
+first-party cache, checkpoint, and intermediate result in this repository —
+trap sequences, fitted distribution parameters, extracted MD structures, and
+benchmark checkpoints — is written and read as `.npz`/`.npy` (NumPy array
+formats) or JSON. NumPy files are loaded with `allow_pickle=False` (the
+default), so these formats do not deserialize embedded Python objects.
 
 The one remaining use of `pickle.load` in the codebase
 (`processes/trajectory_analyzer/dm.py`, loading files under
@@ -49,15 +49,15 @@ The one remaining use of `pickle.load` in the codebase
 never read from a user- or CLI-supplied path — they ship with the code, not
 with any dataset a user points the tools at.
 
-If you find a code path where a `.pkl`/pickle payload from a
+If you find a code path where a `.pkl` or `.pickle` payload from a
 user-controlled location (a CLI argument, a data directory, a downloaded
 archive) is deserialized, please report it as above — that would be exactly
 the class of issue this policy exists to prevent.
 
 ### Dependencies
 
-Dependencies and their pinned version ranges are declared in
-`pyproject.toml` and `environment.yml`. If you find a vulnerability in a
-dependency that materially affects this project (not just a theoretical CVE
-in an unused code path), a report is still welcome so we can evaluate
-whether to bump the pin.
+Supported dependency ranges are declared in `pyproject.toml`; the exact
+reference environment is recorded in `environment.yml`. If you find a
+vulnerability in a dependency that materially affects this project (not just
+a theoretical CVE in an unused code path), a report is still welcome so we
+can evaluate whether to update the affected version constraint.

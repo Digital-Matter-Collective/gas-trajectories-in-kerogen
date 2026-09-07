@@ -132,7 +132,7 @@ Installing the package provides these supported entry points:
 |---|---|---|
 | Filter a gas trajectory | `gas-traj-extract-gas-trajectory` | GRO-like trajectory |
 | Filter selected kerogen molecules | `gas-traj-extract-krg-trajectory` | GRO-like trajectory |
-| Extract dynamic structures | `gas-traj-extract-structures` | structure pickle files |
+| Extract dynamic structures | `gas-traj-extract-structures` | structure `.npz` files |
 | Binarize structures | `gas-traj-binarize-structures` | NumPy and raw images |
 | Build distance maps | `gas-traj-distance-maps` | NumPy distance maps |
 | Search DM parameters (Table I) | `gas-traj-dm-search` | checkpoints and search manifest |
@@ -218,9 +218,24 @@ up. The reference workflow is CPU-based; no GPU is required.
 
 ## Citation and license
 
-If you use this software, cite the metadata in [`CITATION.cff`](CITATION.cff).
-The software is distributed under the [MIT License](LICENSE).
+If you use the software or its methods, cite the archived software release
+using the metadata in [`CITATION.cff`](CITATION.cff):
+
+> Ananev, A., Potapova, M., Vostroknutov, T., Kondratyuk, N., & Khlyupin, A.
+> (2026). *gas-trajectories-in-kerogen* (Version 1.0.0) [Computer software].
+> Zenodo. <https://doi.org/10.5281/zenodo.22309112>
+
+GitHub's **Cite this repository** menu reads `CITATION.cff` and can export
+this citation in APA and BibTeX formats. The software is distributed under
+the [MIT License](LICENSE).
 
 Research datasets are not distributed by this repository and are not covered
-by the software license. Their license and DOI will be stated separately in
-the publication data archive.
+by the software license. If you use the accompanying molecular-dynamics or
+derived data, cite its Zenodo record separately in addition to the software:
+<https://doi.org/10.5281/zenodo.22309334>. Use the **Citation** panel on that
+record to export the dataset citation in the style required by the journal.
+
+When the accompanying article receives a DOI, add it to the commented
+`preferred-citation` template at the bottom of `CITATION.cff`. Use the bare
+DOI (for example, `10.xxxx/example`), not the `https://doi.org/` URL; citation
+tools will create the link automatically.
