@@ -218,12 +218,13 @@ up. The reference workflow is CPU-based; no GPU is required.
 
 ## Citation and license
 
-If you use the software or its methods, cite the archived software release
-using the metadata in [`CITATION.cff`](CITATION.cff):
+If you use the software or its methods, cite it using the concept DOI in
+[`CITATION.cff`](CITATION.cff). This DOI represents all software versions and
+will continue to resolve after new releases are published:
 
 > Ananev, A., Potapova, M., Vostroknutov, T., Kondratyuk, N., & Khlyupin, A.
 > (2026). *gas-trajectories-in-kerogen* (Version 1.0.0) [Computer software].
-> Zenodo. <https://doi.org/10.5281/zenodo.22309112>
+> Zenodo. <https://doi.org/10.5281/zenodo.22309111>
 
 GitHub's **Cite this repository** menu reads `CITATION.cff` and can export
 this citation in APA and BibTeX formats. The software is distributed under
