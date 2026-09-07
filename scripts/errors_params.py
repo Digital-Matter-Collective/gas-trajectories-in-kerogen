@@ -13,13 +13,13 @@ from base.discretecdf import DiscreteCDF
 from base.empiricalcdf import EmpiricalCDF
 from processes.distribution_fitter import WeibullFitter
 from processes.kerogen_walk_simulator import KerogenWalkSimulator
-from processes.trajectory_analyzer.dm import DistanceMatrixAnalyzer
 from scripts.dm_parameter_search import (
     CANDIDATE_GRID,
     CANDIDATE_SHAPE,
     K_VALUES,
     P_VALUES,
     build_search_manifest,
+    evaluate_trajectory_for_scale,
     expected_result_metadata,
     result_file_name,
     save_search_manifest,
@@ -264,29 +264,49 @@ def run(
                     continue
 
                 start_time = time.time()
-
-                def evaluate(parameter_index: int) -> tuple[float, int]:
-                    candidate = scale_candidates[parameter_index]
-                    analyzer = DistanceMatrixAnalyzer(candidate.to_params())
-                    trajectory_errors = []
-                    for trajectory, expected in zip(trajectories, ground_truth):
-                        predicted = analyzer.run(trajectory)
-                        if predicted.shape != expected.shape:
-                            raise RuntimeError(
-                                "DM result and ground truth have different "
-                                f"shapes: {predicted.shape} != {expected.shape}"
-                            )
-                        trajectory_errors.append(
-                            float(np.mean(predicted != expected))
-                        )
-                    return float(np.mean(trajectory_errors)), parameter_index
-
-                scale_results = Parallel(n_jobs=n_jobs)(
-                    delayed(evaluate)(parameter_index)
-                    for parameter_index in range(len(scale_candidates))
+                trajectory_errors = np.empty(
+                    (trajectory_count, len(scale_candidates)), dtype=np.float64
                 )
-                for mean_error, parameter_index in scale_results:
-                    errors[scale_index, parameter_index] = mean_error
+                result_stream = Parallel(
+                    n_jobs=n_jobs, return_as="generator_unordered"
+                )(
+                    delayed(evaluate_trajectory_for_scale)(
+                        trajectory_index,
+                        trajectory,
+                        expected,
+                        scale_index,
+                    )
+                    for trajectory_index, (trajectory, expected) in enumerate(
+                        zip(trajectories, ground_truth)
+                    )
+                )
+                progress_interval = max(1, trajectory_count // 10)
+                for completed_count, result in enumerate(
+                    result_stream, start=1
+                ):
+                    trajectory_index, candidate_errors = result
+                    trajectory_errors[trajectory_index] = candidate_errors
+                    if (
+                        completed_count == 1
+                        or completed_count % progress_interval == 0
+                        or completed_count == trajectory_count
+                    ):
+                        kprint(
+                            f"Scale progress {completed_count}/{trajectory_count} "
+                            f"trajectories; k={k}, p={p}, scale={scale_index}; "
+                            f"time={time.time() - start_time:.1f}s"
+                        )
+
+                for parameter_index in range(len(scale_candidates)):
+                    # Preserve the original candidate-major floating-point
+                    # reduction order even though workers now run by trajectory.
+                    ordered_errors = [
+                        trajectory_errors[trajectory_index, parameter_index]
+                        for trajectory_index in range(trajectory_count)
+                    ]
+                    errors[scale_index, parameter_index] = float(
+                        np.mean(ordered_errors)
+                    )
 
                 _save_checkpoint(result_path, metadata, errors)
                 completed_candidates += len(scale_candidates)

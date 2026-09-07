@@ -1,7 +1,8 @@
 import pickle
 from dataclasses import dataclass, field
+from functools import lru_cache
 from importlib import resources
-from typing import Dict, List, Optional, Sequence, Tuple, cast
+from typing import Dict, List, MutableMapping, Optional, Sequence, Tuple, cast
 
 import numpy as np
 import numpy.typing as npt
@@ -14,6 +15,26 @@ from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 from utils.types import NPBArray, NPFArray, NPIArray, f32
 
 _THRESHOLD_PACKAGE = "list_threshold"
+
+RQAMeasures = Tuple[NPIArray, NPIArray, NPIArray]
+RQACache = MutableMapping[Tuple[int, int, float], RQAMeasures]
+
+
+@lru_cache(maxsize=None)
+def _load_threshold_table(threshold_name: str, method: str) -> NPIArray:
+    """Load each immutable threshold table once per Python process."""
+    threshold_resource = resources.files(_THRESHOLD_PACKAGE).joinpath(
+        threshold_name
+    )
+    if not threshold_resource.is_file():
+        raise FileNotFoundError(
+            f"DM threshold table not found: "
+            f"{_THRESHOLD_PACKAGE}/{threshold_name}"
+        )
+    with threshold_resource.open("rb") as handle:
+        mat = pickle.load(handle)
+    return cast(NPIArray, mat["list_threshold"][method])
+
 
 list_vert_median = {
     (0, 'Bm'): [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -152,19 +173,8 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
             f"nuc{int(self.params.nu * 100)}"
             f"diag_perc={self.params.diag_percentile}.pkl"
         )
-        threshold_resource = resources.files(_THRESHOLD_PACKAGE).joinpath(
-            threshold_name
-        )
-        if not threshold_resource.is_file():
-            raise FileNotFoundError(
-                f"DM threshold table not found: "
-                f"{_THRESHOLD_PACKAGE}/{threshold_name}"
-            )
-        with threshold_resource.open("rb") as handle:
-            mat = pickle.load(handle)
-
         method = self.params.traj_type + "_3D"
-        self.list_threshold = mat["list_threshold"][method]
+        self.list_threshold = _load_threshold_table(threshold_name, method)
 
     @staticmethod
     def name() -> str:
@@ -175,6 +185,34 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         points = trj.points_without_periodic
         sq_dist_matrix = self.compute_pairwise_sq_dist(points)
 
+        return self.run_from_sq_dist_matrix(sq_dist_matrix)
+
+    def run_from_sq_dist_matrix(
+        self,
+        sq_dist_matrix: NPFArray,
+        rqa_cache: Optional[RQACache] = None,
+    ) -> npt.NDArray[np.bool_]:
+        """Classify from an already normalized pairwise-distance matrix.
+
+        ``rqa_cache`` may be shared by analyzers processing the same matrix.
+        Its key contains every parameter that affects the expensive RQA
+        measures; thresholding remains candidate-specific.
+        """
+        if (
+            sq_dist_matrix.ndim != 2
+            or sq_dist_matrix.shape[0] != sq_dist_matrix.shape[1]
+        ):
+            raise ValueError(
+                "Expected a square pairwise-distance matrix, got "
+                f"{sq_dist_matrix.shape}"
+            )
+        if sq_dist_matrix.shape[0] < self.MIN_TRAJECTORY_POINTS:
+            raise ValueError(
+                f"{self.__class__.__name__} requires at least "
+                f"{self.MIN_TRAJECTORY_POINTS} trajectory points; "
+                f"got {sq_dist_matrix.shape[0]}"
+            )
+
         def analyse(mu: float) -> Tuple[bool, NPFArray, NPBArray]:
             return self.analyse_by_mu(
                 sq_dist_matrix,
@@ -182,11 +220,12 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
                 self.params.nu,
                 mu,
                 self.list_threshold,
+                rqa_cache,
             )
 
         results = [analyse(mu) for mu in self.params.list_mu]
 
-        list_trapped = np.zeros((trj.count_points,), dtype=np.bool_)
+        list_trapped = np.zeros((sq_dist_matrix.shape[0],), dtype=np.bool_)
         for flag, _, result in results:
             if flag:
                 list_trapped |= result
@@ -209,6 +248,7 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
         nu: float,
         mu: float,
         list_threshold: NPIArray,
+        rqa_cache: Optional[RQACache] = None,
     ) -> Tuple[bool, NPFArray, NPBArray]:
         count_points = sq_dist_matrix.shape[0]
         ind1 = int(mu * 2) - 1
@@ -220,13 +260,21 @@ class DistanceMatrixAnalyzer(TrajectoryAnalyzer):
                 np.zeros(shape=(count_points,), dtype=f32),
                 np.zeros(shape=(count_points,), dtype=np.bool_),
             )
-        (
-            list_vertical_m,
-            list_diagonal_m,
-            list_parallel_m,
-        ) = self.RQA_block_measures(
-            sq_dist_matrix, mu, self.diag_fill_list[int(2 * mu) - 1]
-        )
+        diagonal_max = self.diag_fill_list[int(2 * mu) - 1]
+        if rqa_cache is None:
+            measures = self.RQA_block_measures(sq_dist_matrix, mu, diagonal_max)
+        else:
+            cache_key = (self.params.kernel_size, diagonal_max, float(mu))
+            cached_measures = rqa_cache.get(cache_key)
+            if cached_measures is None:
+                measures = self.RQA_block_measures(
+                    sq_dist_matrix, mu, diagonal_max
+                )
+                rqa_cache[cache_key] = measures
+            else:
+                measures = cached_measures
+
+        list_vertical_m, list_diagonal_m, list_parallel_m = measures
 
         invariant = list_vertical_m / (list_parallel_m + list_diagonal_m - 1)
         list_trapped_m = invariant > nu

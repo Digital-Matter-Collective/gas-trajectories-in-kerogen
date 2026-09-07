@@ -5,12 +5,18 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Sequence
 
 import numpy as np
 
-from processes.trajectory_analyzer.dm import DistanceMatrixParams
+from base.trajectory import Trajectory
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
+    RQACache,
+)
 
 SEARCH_SCHEMA_VERSION = 1
 K_VALUES = (0.1, 0.5, 0.9)
@@ -94,6 +100,47 @@ def build_candidate_grid() -> tuple[tuple[DMCandidate, ...], ...]:
 
 CANDIDATE_GRID = build_candidate_grid()
 CANDIDATE_SHAPE = (len(CANDIDATE_GRID), len(CANDIDATE_GRID[0]))
+
+
+@lru_cache(maxsize=None)
+def candidate_analyzer(
+    scale_index: int, parameter_index: int
+) -> DistanceMatrixAnalyzer:
+    """Reuse candidate setup and threshold tables inside each worker."""
+    candidate = CANDIDATE_GRID[scale_index][parameter_index]
+    return DistanceMatrixAnalyzer(candidate.to_params())
+
+
+def evaluate_trajectory_for_scale(
+    trajectory_index: int,
+    trajectory: Trajectory,
+    expected: np.ndarray,
+    scale_index: int,
+) -> tuple[int, np.ndarray]:
+    """Evaluate one scale row while sharing trajectory-dependent DM work."""
+    first_analyzer = candidate_analyzer(scale_index, 0)
+    first_analyzer.validate_trajectory(trajectory)
+    sq_dist_matrix = first_analyzer.compute_pairwise_sq_dist(
+        trajectory.points_without_periodic
+    )
+    rqa_cache: RQACache = {}
+    candidate_errors = np.empty(
+        len(CANDIDATE_GRID[scale_index]), dtype=np.float64
+    )
+    for parameter_index in range(len(candidate_errors)):
+        analyzer = candidate_analyzer(scale_index, parameter_index)
+        predicted = analyzer.run_from_sq_dist_matrix(sq_dist_matrix, rqa_cache)
+        if predicted.shape != expected.shape:
+            raise RuntimeError(
+                "DM result and ground truth have different shapes: "
+                f"{predicted.shape} != {expected.shape}"
+            )
+        candidate_errors[parameter_index] = float(
+            np.mean(predicted != expected)
+        )
+    return trajectory_index, candidate_errors
+
+
 TABLE_I_CANDIDATE_INDICES = {
     0.1: (2, 33),
     0.5: (1, 57),

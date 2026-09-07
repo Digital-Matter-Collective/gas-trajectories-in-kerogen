@@ -5,7 +5,11 @@ import pytest
 
 from base.boundingbox import BoundingBox, Range
 from base.trajectory import Trajectory
-from processes.trajectory_analyzer.dm import DistanceMatrixAnalyzer
+from processes.trajectory_analyzer.dm import (
+    DistanceMatrixAnalyzer,
+    DistanceMatrixParams,
+    RQACache,
+)
 from processes.trajectory_analyzer.trajectory_analyzer import TrajectoryAnalyzer
 
 
@@ -32,6 +36,58 @@ def test_dm_edge_label_uses_the_destination_point() -> None:
 
     # The edge entering the first trapped point is therefore labeled trapped.
     np.testing.assert_array_equal(edge_labels, [False, True, True, False])
+
+
+def test_dm_precomputed_distance_path_matches_regular_run() -> None:
+    trajectory = _trajectory(10)
+    params = DistanceMatrixParams(kernel_size=0, list_mu=np.array([0.5]))
+    analyzer = DistanceMatrixAnalyzer(params)
+    sq_dist_matrix = analyzer.compute_pairwise_sq_dist(
+        trajectory.points_without_periodic
+    )
+
+    expected = analyzer.run(trajectory)
+    actual = analyzer.run_from_sq_dist_matrix(sq_dist_matrix)
+
+    np.testing.assert_array_equal(actual, expected)
+
+
+def test_dm_reuses_rqa_measures_between_compatible_candidates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    point_count = 10
+    threshold = np.full((12, 100), 2, dtype=np.int32)
+    calls = 0
+
+    def fixed_measures(
+        *args: Any, **kwargs: Any
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        nonlocal calls
+        del args, kwargs
+        calls += 1
+        return (
+            np.full(point_count, 2, dtype=np.int32),
+            np.ones(point_count, dtype=np.int32),
+            np.ones(point_count, dtype=np.int32),
+        )
+
+    analyzers = []
+    for nu in (0.5, 0.9):
+        analyzer = object.__new__(DistanceMatrixAnalyzer)
+        analyzer.params = DistanceMatrixParams(
+            nu=nu, kernel_size=0, list_mu=np.array([0.5])
+        )
+        analyzer.diag_fill_list = [0] * 12
+        analyzer.list_threshold = threshold
+        monkeypatch.setattr(analyzer, "RQA_block_measures", fixed_measures)
+        analyzers.append(analyzer)
+
+    cache: RQACache = {}
+    sq_dist_matrix = np.zeros((point_count, point_count), dtype=np.float32)
+    for analyzer in analyzers:
+        analyzer.run_from_sq_dist_matrix(sq_dist_matrix, cache)
+
+    assert calls == 1
 
 
 def test_dm_scale_shorter_than_its_threshold_returns_a_complete_result() -> (
