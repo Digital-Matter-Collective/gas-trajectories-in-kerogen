@@ -14,8 +14,8 @@ from utils.utils import ps_generate
 
 def _write_pnm_fixture(prefix: Path) -> None:
     """A tiny 4-pore network: pore1(r=0.10) -- pore2(r=0.20) -- pore3(r=0.15),
-    with pore2 also -- pore4(r=0.25); plus one throat to the boundary
-    reservoir (pore index 0) that `read_pnm_ext_data` must drop."""
+    with pore2 also -- pore4(r=0.25); plus inlet/outlet boundary throats with
+    node numbers below 1 that `read_pnm_ext_data` must drop."""
     (prefix.parent / f"{prefix.name}_node1.dat").write_text(
         "4    0    0    0\n"
         "1    0.0    0.0    0.0\n"
@@ -30,11 +30,13 @@ def _write_pnm_fixture(prefix: Path) -> None:
         "4    0.0    0.25\n"
     )
     (prefix.parent / f"{prefix.name}_link1.dat").write_text(
-        "4\n"
+        "6\n"
         "1 1 2 0.05 0.6 0.5\n"
         "2 2 3 0.05 0.6 0.6\n"
         "3 2 4 0.05 0.6 0.7\n"
         "4 1 0 0.05 0.6 0.3\n"
+        "5 0 3 0.05 0.6 0.4\n"
+        "6 2 -1 0.05 0.6 0.8\n"
     )
 
 
@@ -52,8 +54,9 @@ def test_load_pnm_graph_reads_real_pore_radii_and_throat_lengths(
     assert graph.nodes[2]["size"] == pytest.approx(0.15)
     assert graph.nodes[3]["size"] == pytest.approx(0.25)
 
-    # The boundary throat (pore1 -> reservoir 0) must not create a node.
+    # Boundary throats in either orientation must not create graph nodes.
     assert -1 not in graph.nodes
+    assert -2 not in graph.nodes
     assert graph.number_of_edges() == 3
     assert graph[0][1]["weight"] == pytest.approx(0.5)
     assert graph[1][2]["weight"] == pytest.approx(0.6)

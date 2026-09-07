@@ -309,12 +309,11 @@ class Reader:
         linked_list, t_throat_lengths = Reader.read_pnm_ext_linklist(
             path_to_link_1
         )
-        mask0 = linked_list[:, 0] <= 0
-        mask1 = linked_list[:, 1] <= 0
-
-        throat_mask = np.logical_not(np.logical_or(mask0, mask1))
-        t_throat_lengths = t_throat_lengths[throat_mask, :]
-        linked_list = linked_list[throat_mask]
+        # Statoil uses node numbers below 1 for inlet/outlet reservoirs.
+        # These are boundary throats, not connections between real pores.
+        internal_throat_mask = np.all(linked_list >= 1, axis=1)
+        t_throat_lengths = t_throat_lengths[internal_throat_mask, :]
+        linked_list = linked_list[internal_throat_mask]
         linked_list[:, 0] -= 1
         linked_list[:, 1] -= 1
 

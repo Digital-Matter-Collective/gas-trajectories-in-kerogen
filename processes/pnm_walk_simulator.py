@@ -29,9 +29,11 @@ def load_pnm_graph(
     with them) — Statoil-format PNMs can contain zero/negative-radius or
     boundary-reservoir entries that are not real pores; `read_pnm_data`
     elsewhere in this codebase filters the same way for distribution
-    fitting. Positions are not attached to nodes: `PnmWalkSimulator` places
-    points in its own running trajectory frame, not in the PNM's absolute
-    coordinate frame (see its docstring).
+    fitting. A throat with either one-based node number below 1 is an
+    inlet/outlet boundary throat and is discarded by `read_pnm_ext_data`
+    before graph construction. Positions are not attached to nodes:
+    `PnmWalkSimulator` places points in its own running trajectory frame, not
+    in the PNM's absolute coordinate frame (see its docstring).
     """
     radiuses, throat_lengths, linked_list, _positions = (
         Reader.read_pnm_ext_data(pnm_prefix, scale=scale)
