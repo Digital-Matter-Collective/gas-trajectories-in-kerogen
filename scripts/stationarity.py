@@ -880,11 +880,6 @@ def analysis(
     samples_r = {}
 
     for step, file in sorted_lfiles:
-        # The first saved frame precedes equilibration and is deliberately not
-        # used as the stationarity baseline. The first retained PNM is baseline.
-        if step == 25000:
-            continue
-
         radiuses, throat_lengths = Reader.read_pnm_data(
             join(path_to_pnms, file[:-10]), border=0.015
         )

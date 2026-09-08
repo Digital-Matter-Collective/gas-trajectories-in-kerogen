@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -5,13 +6,14 @@ import numpy.lib.npyio as npyio
 import pytest
 
 from base.kerogendata import AtomData
+from scripts.dynamic_struct_extractor import build_indexes_from_args
 from scripts.structure_image_utils import (
     collect_indexes,
-    generate_indexes_by_mode,
     generate_indexes_from_available_structures,
     load_structure,
     parse_indexes,
     save_structure,
+    select_indexes_from_available,
 )
 
 
@@ -26,6 +28,16 @@ def _make_atoms(count: int) -> list[AtomData]:
         )
         for i in range(count)
     ]
+
+
+def _write_empty_gro(path: Path, steps: list[int]) -> None:
+    frames = [
+        f"Kerogen t= {position:.5f} step= {step}\n"
+        "0\n"
+        "1.00000 1.00000 1.00000\n"
+        for position, step in enumerate(steps)
+    ]
+    path.write_text("".join(frames), encoding="utf-8")
 
 
 def test_load_structure_round_trips_save_structure(tmp_path: Path) -> None:
@@ -103,34 +115,31 @@ def test_collect_indexes_deduplicates_and_requires_at_least_one() -> None:
         collect_indexes([], None)
 
 
-def test_generate_indexes_by_mode_all_returns_exact_count_with_endpoints() -> (
+def test_select_indexes_from_available_returns_exact_count_with_endpoints() -> (
     None
 ):
     # Reproduces the P1-05 report: 6,560-step trajectory, 500 requested
     # structures must not silently become 501.
-    indexes = generate_indexes_by_mode(
-        start_step=25000,
-        step_size=250000,
-        full_count_steps=6560,
-        count_structures=500,
+    available = list(range(25000, 25000 + 250000 * 6561, 250000))
+    indexes = select_indexes_from_available(
+        available,
+        count=500,
         mode="all",
     )
 
     assert len(indexes) == 500
     assert len(set(indexes)) == 500
-    assert indexes[0] == 25000
-    assert indexes[-1] == 25000 + 250000 * 6560
+    assert indexes[0] == available[0]
+    assert indexes[-1] == available[-1]
 
 
-def test_generate_indexes_by_mode_all_handles_fewer_positions_than_requested() -> (
+def test_select_indexes_from_available_handles_fewer_positions_than_requested() -> (
     None
 ):
     # Only 11 distinct integer positions exist between 0 and 10 inclusive.
-    indexes = generate_indexes_by_mode(
-        start_step=0,
-        step_size=1,
-        full_count_steps=10,
-        count_structures=500,
+    indexes = select_indexes_from_available(
+        range(11),
+        count=500,
         mode="all",
     )
 
@@ -139,28 +148,75 @@ def test_generate_indexes_by_mode_all_handles_fewer_positions_than_requested() -
     assert indexes[-1] == 10
 
 
-def test_generate_indexes_by_mode_all_single_structure_is_the_start() -> None:
-    indexes = generate_indexes_by_mode(
-        start_step=25000,
-        step_size=250000,
-        full_count_steps=6560,
-        count_structures=1,
+def test_select_indexes_from_available_single_structure_is_the_start() -> None:
+    indexes = select_indexes_from_available(
+        [25000, 275000, 525000],
+        count=1,
         mode="all",
     )
     assert indexes == [25000]
 
 
-def test_generate_indexes_by_mode_part_returns_first_consecutive_steps() -> (
-    None
-):
-    indexes = generate_indexes_by_mode(
-        start_step=0,
-        step_size=250000,
-        full_count_steps=6560,
-        count_structures=10,
+def test_select_indexes_from_available_part_returns_first_indexes() -> None:
+    available = [0, 3, 10, 50, 51, 80, 200, 400, 900, 901, 2000]
+    indexes = select_indexes_from_available(
+        available,
+        count=10,
         mode="part",
     )
-    assert indexes == [250000 * i for i in range(10)]
+    assert indexes == available[:10]
+
+
+def test_select_indexes_from_available_supports_irregular_steps() -> None:
+    indexes = select_indexes_from_available(
+        [30000, 90000, 100000, 400000, 900000],
+        count=3,
+        mode="all",
+    )
+
+    assert indexes == [30000, 100000, 900000]
+
+
+def test_dynamic_extractor_selects_500_frames_after_skipping_first(
+    tmp_path: Path,
+) -> None:
+    trajectory = tmp_path / "trajectory.gro"
+    steps = [25000 + 250000 * position for position in range(1001)]
+    _write_empty_gro(trajectory, steps)
+    args = argparse.Namespace(
+        auto_indexes=True,
+        input=trajectory,
+        count_structures=500,
+        mode="all",
+        index=[],
+        indexes_file=None,
+    )
+
+    indexes = build_indexes_from_args(args)
+
+    assert len(indexes) == 500
+    assert len(set(indexes)) == 500
+    assert indexes[0] == steps[1]
+    assert indexes[-1] == steps[-1]
+    assert set(indexes) <= set(steps[1:])
+    assert 25000 not in indexes
+
+
+def test_dynamic_extractor_excludes_first_frame_from_explicit_indexes(
+    tmp_path: Path,
+) -> None:
+    trajectory = tmp_path / "trajectory.gro"
+    _write_empty_gro(trajectory, [25000, 275000, 525000])
+    args = argparse.Namespace(
+        auto_indexes=False,
+        input=trajectory,
+        count_structures=None,
+        mode="all",
+        index=["25000,275000"],
+        indexes_file=None,
+    )
+
+    assert build_indexes_from_args(args) == [275000]
 
 
 def test_generate_indexes_from_available_structures_all_returns_exact_count(

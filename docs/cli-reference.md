@@ -48,12 +48,11 @@ Installed command: `gas-traj-extract-structures`.
 |---|---|---|
 | `input` | required | Input multi-frame GRO trajectory. |
 | `output_dir` | required | Directory for extracted `struct-num=..._time-ps=....npz` structures; it is created if needed. |
-| `--index STEP` | selection required unless `--auto-indexes`; repeatable | Extract a simulation step. One occurrence may contain comma- or whitespace-separated steps. |
+| `--index STEP` | selection required unless `--auto-indexes`; repeatable | Extract a simulation step. One occurrence may contain comma- or whitespace-separated steps. A request for the first trajectory frame is ignored. |
 | `--indexes-file FILE` | selection required unless `--auto-indexes` | Text file containing comma- or whitespace-separated simulation steps. It may be combined with `--index`. |
-| `--auto-indexes` | off | Infer the starting step and spacing from the GRO headers and generate the requested steps automatically. Mutually exclusive with `--index`/`--indexes-file`. |
-| `--mode {all,part}` | `all` | With `--auto-indexes`, `all` spreads steps over the complete trajectory and includes both ends; `part` selects consecutive steps from the beginning. |
-| `--count-structures N` | required with `--auto-indexes` | Number of structures requested. Fewer are returned only if there are not enough distinct available positions. |
-| `--full-count-steps N` | inferred | Override the old “last frame position” value used by automatic selection. When omitted, the script scans the trajectory to count frames and uses `frame_count - 1`. |
+| `--auto-indexes` | off | Read available steps from the GRO headers, always exclude the first frame, and select the requested structures. Mutually exclusive with `--index`/`--indexes-file`. |
+| `--mode {all,part}` | `all` | With `--auto-indexes`, `all` spreads steps from the second available frame through the last, including both endpoints; `part` takes frames consecutively beginning with the second. |
+| `--count-structures N` | required with `--auto-indexes` | Number of structures requested. Fewer are returned only if fewer frames remain after excluding the first. |
 | `--slice-len N` | `100` | Number of requested structures read in one batch; affects I/O batching, not the selected set. |
 | `--dry-run` | off | Print the generated/explicit indexes without extracting structures. |
 

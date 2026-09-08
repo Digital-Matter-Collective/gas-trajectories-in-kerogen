@@ -186,10 +186,10 @@ python -m scripts.dynamic_struct_extractor \
   --auto-indexes --mode all --count-structures 500 --dry-run
 ```
 
-Then remove `--dry-run` to extract the structures. `mode=all` always spreads
-indexes evenly and includes both the first and last available step; the
-returned count equals `--count-structures` unless the trajectory has fewer
-distinct integer positions than requested.
+Then remove `--dry-run` to extract the structures. The first trajectory frame
+is always excluded. `mode=all` spreads indexes evenly from the second frame to
+the last available frame, including both of those endpoints. The returned
+count equals `--count-structures` unless fewer eligible frames are available.
 
 Build binary images and distance maps:
 
@@ -487,9 +487,9 @@ python -m scripts.stationarity \
 ```
 
 The command writes stationarity SVG files and
-`ks_stationarity/stationarity_summary.csv` and `.json`. The frame
-at step 25000 is excluded as pre-equilibration; the first later available PNM
-is the baseline.
+`ks_stationarity/stationarity_summary.csv` and `.json`. The pre-equilibration
+frame was excluded during structure extraction; the first available PNM is
+the baseline.
 
 ## 10. Manual structure and trajectory visualization (Figures 1, 2, 4, 7, 10)
 

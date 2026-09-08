@@ -6,10 +6,10 @@ import numpy as np
 
 from scripts.structure_image_utils import (
     collect_indexes,
-    generate_indexes_by_mode,
     kprint,
     save_structure,
     scan_gro_trajectory_info,
+    select_indexes_from_available,
     structure_file_name,
 )
 from utils.logging_setup import setup_logging
@@ -56,38 +56,38 @@ def extract_structures(
 
 def build_indexes_from_args(args: argparse.Namespace) -> list[int]:
     if args.auto_indexes:
-        info = scan_gro_trajectory_info(
-            args.input,
-            count_all_frames=args.full_count_steps is None,
-        )
-        if info.step_size is None:
-            raise ValueError("Need at least two frames to infer step size")
+        info = scan_gro_trajectory_info(args.input, count_all_frames=True)
+        if info.available_steps is None or len(info.available_steps) < 2:
+            raise ValueError("Need at least two trajectory frames")
+        if len(set(info.available_steps)) != len(info.available_steps):
+            raise ValueError("Trajectory frame step numbers must be unique")
 
-        full_count_steps = args.full_count_steps
-        if full_count_steps is None:
-            if info.frame_count is None:
-                raise ValueError("Cannot infer full_count_steps")
-            full_count_steps = info.frame_count - 1
-
-        indexes = generate_indexes_by_mode(
-            start_step=info.start_step,
-            step_size=info.step_size,
-            full_count_steps=full_count_steps,
-            count_structures=args.count_structures,
+        eligible_steps = info.available_steps[1:]
+        indexes = select_indexes_from_available(
+            eligible_steps,
+            count=args.count_structures,
             mode=args.mode,
         )
         kprint(
             "Trajectory info: "
-            f"start_step={info.start_step}, "
-            f"step_size={info.step_size}, "
-            f"start_time={info.start_time}, "
-            f"time_step_size={info.time_step_size}, "
-            f"full_count_steps={full_count_steps}"
+            f"skipped_first_step={info.start_step}, "
+            f"first_selected_step={indexes[0]}, "
+            f"last_selected_step={indexes[-1]}, "
+            f"frame_count={info.frame_count}"
         )
         kprint(f"Generated structure indexes: {len(indexes)}")
         return indexes
 
-    return collect_indexes(args.index, args.indexes_file)
+    indexes = collect_indexes(args.index, args.indexes_file)
+    first_step = scan_gro_trajectory_info(
+        args.input, count_all_frames=False
+    ).start_step
+    filtered_indexes = [index for index in indexes if index != first_step]
+    if len(filtered_indexes) != len(indexes):
+        kprint(f"Skipping first trajectory frame with step={first_step}")
+    if not filtered_indexes:
+        raise ValueError("The first trajectory frame cannot be extracted")
+    return filtered_indexes
 
 
 def main() -> None:
@@ -103,7 +103,10 @@ def main() -> None:
         "--index",
         action="append",
         default=[],
-        help="Structure step number. Can be repeated or comma-separated.",
+        help=(
+            "Structure step number. Can be repeated or comma-separated; "
+            "the first trajectory frame is always ignored."
+        ),
     )
     parser.add_argument(
         "--indexes-file",
@@ -113,26 +116,23 @@ def main() -> None:
     parser.add_argument(
         "--auto-indexes",
         action="store_true",
-        help="Infer trajectory parameters and generate indexes by mode/count.",
+        help=(
+            "Read available steps from trajectory headers, skip the first "
+            "frame, and select indexes by mode/count."
+        ),
     )
     parser.add_argument(
         "--mode",
         choices=["all", "part"],
         default="all",
-        help="Old-style index generation mode for --auto-indexes.",
+        help=(
+            "Selection mode for --auto-indexes: evenly spread or first part."
+        ),
     )
     parser.add_argument(
         "--count-structures",
         type=int,
         help="How many structures to request in --auto-indexes mode.",
-    )
-    parser.add_argument(
-        "--full-count-steps",
-        type=int,
-        help=(
-            "Old full_count_steps value. If omitted, frames are counted by "
-            "quickly skipping through the trajectory."
-        ),
     )
     parser.add_argument(
         "--slice-len",

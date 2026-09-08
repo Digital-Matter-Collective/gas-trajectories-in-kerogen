@@ -53,6 +53,7 @@ class GroTrajectoryInfo:
     time_step_size: float | None
     frame_count: int | None
     last_step: int | None
+    available_steps: tuple[int, ...] | None
 
 
 @dataclass(frozen=True)
@@ -130,7 +131,7 @@ def scan_gro_trajectory_info(
                     )
 
             frame_count += 1
-            if len(steps) < 2:
+            if count_all_frames or len(steps) < 2:
                 steps.append(step)
                 times.append(time_ps)
 
@@ -143,11 +144,7 @@ def scan_gro_trajectory_info(
     step_size = steps[1] - steps[0] if len(steps) > 1 else None
     time_step_size = times[1] - times[0] if len(times) > 1 else None
     counted_frames = frame_count if count_all_frames else None
-    last_step = (
-        steps[0] + (counted_frames - 1) * step_size
-        if counted_frames is not None and step_size is not None
-        else None
-    )
+    last_step = steps[-1] if count_all_frames else None
     return GroTrajectoryInfo(
         start_step=steps[0],
         step_size=step_size,
@@ -155,6 +152,7 @@ def scan_gro_trajectory_info(
         time_step_size=time_step_size,
         frame_count=counted_frames,
         last_step=last_step,
+        available_steps=tuple(steps) if count_all_frames else None,
     )
 
 
@@ -232,43 +230,37 @@ def resolve_step_time_mapping(
     )
 
 
-def generate_indexes_by_mode(
-    start_step: int,
-    step_size: int,
-    full_count_steps: int,
-    count_structures: int,
+def select_indexes_from_available(
+    available_indexes: Iterable[int],
+    count: int,
     mode: str,
 ) -> list[int]:
-    """Generate at most `count_structures` step indexes.
+    """Select at most ``count`` indexes from an ordered available set.
 
-    `mode="all"` spreads indexes evenly across the whole trajectory and
-    always includes both the first and the last step; the exact count may be
-    lower than requested only when there are fewer distinct integer
-    positions than `count_structures` (i.e. `count_structures >
-    full_count_steps + 1`). `mode="part"` returns the first `count_structures`
-    consecutive steps.
+    ``mode="all"`` spreads selections by position, including both ends.
+    ``mode="part"`` returns the first available indexes. Values need not be
+    regularly spaced.
     """
-    if count_structures <= 0:
-        raise ValueError("--count-structures must be positive")
+    if count <= 0:
+        raise ValueError("selection count must be positive")
+
+    indexes = list(dict.fromkeys(available_indexes))
+    if not indexes:
+        raise ValueError("No indexes are available for selection")
 
     if mode == "all":
-        if count_structures == 1:
+        if count >= len(indexes):
+            return indexes
+        if count == 1:
             positions = [0]
         else:
+            last_position = len(indexes) - 1
             positions = sorted(
-                {
-                    round(i * full_count_steps / (count_structures - 1))
-                    for i in range(count_structures)
-                }
+                {round(i * last_position / (count - 1)) for i in range(count)}
             )
-        return [start_step + step_size * position for position in positions]
+        return [indexes[position] for position in positions]
     elif mode == "part":
-        last_step = full_count_steps * step_size + start_step
-        return [
-            start_step + step_size * i
-            for i in range(count_structures)
-            if start_step + step_size * i <= last_step
-        ]
+        return indexes[:count]
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
@@ -313,25 +305,11 @@ def generate_indexes_from_available_structures(
     if not available_indexes:
         raise RuntimeError(f"No structure .npz files found in {structures_dir}")
 
-    if mode == "part":
-        return available_indexes[:count_slices]
-    if mode != "all":
-        raise ValueError(f"Unknown mode: {mode}")
-
-    if count_slices >= len(available_indexes):
-        return available_indexes
-
-    last_position = len(available_indexes) - 1
-    if count_slices == 1:
-        positions = [0]
-    else:
-        positions = sorted(
-            {
-                round(i * last_position / (count_slices - 1))
-                for i in range(count_slices)
-            }
-        )
-    return [available_indexes[position] for position in positions]
+    return select_indexes_from_available(
+        available_indexes,
+        count=count_slices,
+        mode=mode,
+    )
 
 
 def collect_processing_indexes(
@@ -406,7 +384,7 @@ def iter_structure_files(
     indexes: Iterable[int] | None = None,
 ) -> list[Path]:
     index_set = set(indexes or [])
-    filenames = []
+    files_by_step = []
 
     for path in structures_dir.iterdir():
         if not path.is_file():
@@ -414,11 +392,12 @@ def iter_structure_files(
         match = STRUCTURE_PATTERN.fullmatch(path.name)
         if not match:
             continue
-        if index_set and int(match.group("step")) not in index_set:
+        step = int(match.group("step"))
+        if index_set and step not in index_set:
             continue
-        filenames.append(path)
+        files_by_step.append((step, path))
 
-    return sorted(filenames)
+    return [path for _, path in sorted(files_by_step, key=lambda item: item[0])]
 
 
 def save_structure(path: Path, struct: Structure) -> None:
