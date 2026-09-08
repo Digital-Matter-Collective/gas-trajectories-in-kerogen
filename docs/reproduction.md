@@ -337,8 +337,8 @@ gas-traj-find-dm-params "$DATA_DIR/errors/find_best_params"
 python -m scripts.find_best_params "$DATA_DIR/errors/find_best_params"
 ```
 
-The aggregation writes `table_iv_optimized_dm_params.csv` and
-`table_iv_optimized_dm_params.json` in the input directory. A smaller
+The aggregation writes `optimized_dm_params.csv` and
+`optimized_dm_params.json` in the input directory. A smaller
 `--trajectory-count` is useful for debugging but is not the Table IV profile.
 
 ## 7. Figures 8 and 13 and Table I: synthetic benchmark
@@ -371,7 +371,7 @@ The command writes:
 
 - `figs/fig08_errors_k=*.svg`: DM/SIB/HYB comparison for Figure 8;
 - `figs/fig13_errors_k=*.svg`: DM/NP/SIB comparison for Figure 13;
-- `errors/table_i_synthetic_k_est.csv` and `.json`: Table I;
+- `errors/synthetic_k_est_summary.csv` and `.json`: Table I;
 - `errors/synthetic_benchmark_manifest.json`: seed, grid, and figure series;
 - `errors/trajectories` and `errors/checkpoints`: resumable caches.
 
@@ -401,31 +401,31 @@ summary directory:
 ```bash
 export CH4_DIR="/path/to/ch4-dataset"
 export H2_DIR="/path/to/h2-dataset"
-export TABLE_II_DIR="/path/to/table-ii-output"
+export TRAPPING_SUMMARY_DIR="/path/to/trapping-summary-output"
 
 gas-traj-trap-distributions \
   "$CH4_DIR" --label CH4 --num 1 \
   --output "$CH4_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_II_DIR"
+  --summary-dir "$TRAPPING_SUMMARY_DIR"
 
 gas-traj-trap-distributions \
   "$H2_DIR" --label H2 --num 2 \
   --output "$H2_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_II_DIR"
+  --summary-dir "$TRAPPING_SUMMARY_DIR"
 
 # Without installing the package:
 python -m scripts.trap_distr_builder \
   "$CH4_DIR" --label CH4 --num 1 \
   --output "$CH4_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_II_DIR"
+  --summary-dir "$TRAPPING_SUMMARY_DIR"
 
 python -m scripts.trap_distr_builder \
   "$H2_DIR" --label H2 --num 2 \
   --output "$H2_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_II_DIR"
+  --summary-dir "$TRAPPING_SUMMARY_DIR"
 ```
 
-The shared directory receives `table_ii_trapping_summary.csv` and `.json`;
+The shared directory receives `trapping_summary.csv` and `.json`;
 rows are updated by gas and classifier without removing the other gas. Cached
 step labels and trap sequences are stored under each dataset's `traps/DM`,
 `traps/SIB`, and `traps/HYB` directories.
@@ -441,11 +441,11 @@ To replace only HYB after an algorithm change:
 ```bash
 gas-traj-trap-distributions \
   "$CH4_DIR" --label CH4 --num 1 \
-  --summary-dir "$TABLE_II_DIR" --recompute HYB
+  --summary-dir "$TRAPPING_SUMMARY_DIR" --recompute HYB
 # Without installing the package:
 python -m scripts.trap_distr_builder \
   "$CH4_DIR" --label CH4 --num 1 \
-  --summary-dir "$TABLE_II_DIR" --recompute HYB
+  --summary-dir "$TRAPPING_SUMMARY_DIR" --recompute HYB
 ```
 
 `--force-recompute` replaces caches for all three classifiers.
@@ -487,7 +487,7 @@ python -m scripts.stationarity \
 ```
 
 The command writes stationarity SVG files and
-`ks_stationarity/table_iii_stationarity_summary.csv` and `.json`. The frame
+`ks_stationarity/stationarity_summary.csv` and `.json`. The frame
 at step 25000 is excluded as pre-equilibration; the first later available PNM
 is the baseline.
 

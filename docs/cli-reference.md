@@ -135,7 +135,7 @@ Installed command: `gas-traj-find-dm-params`.
 | Parameter | Required/default | Meaning |
 |---|---|---|
 | `path` | required | Directory containing the completed `k=..._p=....npz` Table IV search results. |
-| `--output-dir DIR` | input `path` | Directory for `table_iv_optimized_dm_params.csv` and `.json`. |
+| `--output-dir DIR` | input `path` | Directory for `optimized_dm_params.csv` and `.json`. |
 
 ### `sim_algo_check`
 

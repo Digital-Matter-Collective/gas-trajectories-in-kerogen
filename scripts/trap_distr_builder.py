@@ -34,7 +34,7 @@ from utils.logging_setup import setup_logging
 from utils.types import f32
 from utils.utils import kprint
 
-_TABLE_II_HISTOGRAM_BINS = 50
+_TRAPPING_HISTOGRAM_BINS = 50
 _LEGACY_COUPLED_TRAP_EXTRACTOR_VERSION = 2
 
 
@@ -59,7 +59,7 @@ class TrapEventSummary:
 
 
 @dataclass(frozen=True)
-class TableIIRow:
+class TrappingSummaryRow:
     gas: str
     classifier: str
     mu: float
@@ -81,7 +81,7 @@ class TableIIRow:
 def summarize_trap_events(
     trap_list: Sequence[TrapSequence],
 ) -> TrapEventSummary:
-    """Calculate the event statistics reported in Table II."""
+    """Calculate trapping-event statistics for a trajectory collection."""
     if not trap_list:
         raise ValueError("At least one trap sequence is required")
 
@@ -95,7 +95,7 @@ def summarize_trap_events(
     if np.any(event_count == 0):
         raise ValueError("Every trap sequence must contain at least one event")
 
-    # Table II averages the per-trajectory capture probability. This is not,
+    # Average the per-trajectory capture probability. This is not,
     # in general, equal to the ratio of the ensemble-mean event counts.
     k_est = np.mean(n_t / event_count)
     return TrapEventSummary(
@@ -107,7 +107,7 @@ def summarize_trap_events(
     )
 
 
-def _table_ii_sort_key(row: TableIIRow) -> tuple[int, int, str, str]:
+def _trapping_sort_key(row: TrappingSummaryRow) -> tuple[int, int, str, str]:
     classifier_order = {"DM": 0, "SIB": 1, "HYB": 2}
     gas_order = {"CH4": 0, "H2": 1}
     return (
@@ -118,32 +118,32 @@ def _table_ii_sort_key(row: TableIIRow) -> tuple[int, int, str, str]:
     )
 
 
-def save_table_ii_summary(
-    rows: Sequence[TableIIRow], output_dir: Path
+def save_trapping_summary(
+    rows: Sequence[TrappingSummaryRow], output_dir: Path
 ) -> tuple[Path, Path]:
-    """Save Table II rows to CSV/JSON, preserving rows from other gases."""
+    """Save trapping rows to CSV/JSON, preserving rows from other gases."""
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "table_ii_trapping_summary.csv"
-    json_path = output_dir / "table_ii_trapping_summary.json"
+    csv_path = output_dir / "trapping_summary.csv"
+    json_path = output_dir / "trapping_summary.json"
 
-    merged: Dict[tuple[str, str], TableIIRow] = {}
+    merged: Dict[tuple[str, str], TrappingSummaryRow] = {}
     if json_path.is_file():
         existing_data = json.loads(json_path.read_text(encoding="utf-8"))
         if not isinstance(existing_data, list):
             raise ValueError(f"Expected a JSON list in {json_path}")
         for item in existing_data:
-            existing_row = TableIIRow(**item)
+            existing_row = TrappingSummaryRow(**item)
             merged[(existing_row.gas, existing_row.classifier)] = existing_row
 
     for row in rows:
         merged[(row.gas, row.classifier)] = row
-    sorted_rows = sorted(merged.values(), key=_table_ii_sort_key)
+    sorted_rows = sorted(merged.values(), key=_trapping_sort_key)
     serialized_rows = [asdict(row) for row in sorted_rows]
 
     with csv_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(
             file,
-            fieldnames=[field.name for field in fields(TableIIRow)],
+            fieldnames=[field.name for field in fields(TrappingSummaryRow)],
         )
         writer.writeheader()
         writer.writerows(serialized_rows)
@@ -169,7 +169,7 @@ def plot_trapping_on_axis(
     times_us = times * 1e6  # to us
     Pt, bin_edges = np.histogram(
         times_us,
-        bins=_TABLE_II_HISTOGRAM_BINS,
+        bins=_TRAPPING_HISTOGRAM_BINS,
         density=True,
     )
     t = 0.5 * (bin_edges[:-1] + bin_edges[1:])
@@ -283,7 +283,7 @@ def plot_trap_tim_distr(
     t_min: float,
     t_max: float,
     ax1: Any,
-) -> TableIIRow:
+) -> TrappingSummaryRow:
     event_summary = summarize_trap_events(trap_list)
     time_tuple = tuple(trap.times for trap in trap_list)
     time_trapings = np.concatenate(time_tuple)
@@ -295,7 +295,7 @@ def plot_trap_tim_distr(
 
     fit = plot_trapping_on_axis(ax1, non_zero_tt, t_min, t_max, prefix)
 
-    return TableIIRow(
+    return TrappingSummaryRow(
         gas=gas,
         classifier=prefix,
         mu=fit.mu,
@@ -304,7 +304,7 @@ def plot_trap_tim_distr(
         k_est=event_summary.k_est,
         fit_t_min_s=t_min,
         fit_t_max_s=t_max,
-        histogram_bins=_TABLE_II_HISTOGRAM_BINS,
+        histogram_bins=_TRAPPING_HISTOGRAM_BINS,
         n_fit_bins=fit.n_fit_bins,
         n_trajectories=event_summary.n_trajectories,
         n_nonzero_events=event_summary.n_nonzero_events,
@@ -337,7 +337,7 @@ def run(
     t_min_max: Dict[str, Tuple[float, float]],
     ax1: Any,
     recompute_prefixes: Optional[Set[str]] = None,
-) -> list[TableIIRow]:
+) -> list[TrappingSummaryRow]:
     recompute_prefixes = recompute_prefixes or set()
     traj_path = join(path_to_main, "trj.gro")
     pts_trapping = join(path_to_main, "traps")
@@ -542,7 +542,7 @@ if __name__ == '__main__':
         type=Path,
         default=None,
         help=(
-            "Directory for Table II CSV/JSON (default: <path>/traps). "
+            "Directory for trapping CSV/JSON (default: <path>/traps). "
             "Use the same directory for CH4 and H2 to merge both gases."
         ),
     )
@@ -562,9 +562,9 @@ if __name__ == '__main__':
         recompute_prefixes=recompute_prefixes,
     )
     summary_dir = args.summary_dir or args.path / "traps"
-    csv_path, json_path = save_table_ii_summary(summary_rows, summary_dir)
-    kprint(f"Saved Table II summary: {csv_path}")
-    kprint(f"Saved Table II summary: {json_path}")
+    csv_path, json_path = save_trapping_summary(summary_rows, summary_dir)
+    kprint(f"Saved trapping summary: {csv_path}")
+    kprint(f"Saved trapping summary: {json_path}")
 
     # ======================
     # Figure 1 — Survival

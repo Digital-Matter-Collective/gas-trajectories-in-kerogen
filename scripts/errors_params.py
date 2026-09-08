@@ -322,7 +322,7 @@ def run(
 if __name__ == "__main__":
     setup_logging()
     parser = argparse.ArgumentParser(
-        description="Evaluate the deterministic Table IV DM parameter grid"
+        description="Evaluate the deterministic DM parameter grid"
     )
     parser.add_argument("path", type=Path, help="Data directory")
     parser.add_argument(

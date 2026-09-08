@@ -381,7 +381,7 @@ def stationarity_summary_record(
     comparison: str,
     alpha: float = 0.05,
 ) -> Dict[str, object]:
-    """Return the values used in Table III as a serializable record."""
+    """Return stationarity statistics as a serializable record."""
     p_use = res.p_adj if res.p_adj is not None else res.p
     reject = res.reject if res.reject is not None else (p_use <= alpha)
     valid_p = np.isfinite(p_use)
@@ -409,11 +409,11 @@ def stationarity_summary_record(
 def save_stationarity_summary(
     records: Sequence[Dict[str, object]], outdir: Union[str, Path]
 ) -> Tuple[Path, Path]:
-    """Save Table III values in CSV and JSON formats."""
+    """Save stationarity statistics in CSV and JSON formats."""
     output_dir = Path(outdir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "table_iii_stationarity_summary.csv"
-    json_path = output_dir / "table_iii_stationarity_summary.json"
+    csv_path = output_dir / "stationarity_summary.csv"
+    json_path = output_dir / "stationarity_summary.json"
 
     fieldnames = [
         "distribution",
@@ -788,7 +788,7 @@ def run_stationarity_pipeline(
     kprint(f"[{label}] Adjacent summary:\n{adjacent_summary_text}\n")
 
     # This narrative text is not the same content as the compact per-pair
-    # records save_stationarity_summary() writes for Table III -- persist it
+    # Persist the same results that save_stationarity_summary() aggregates.
     # too, so it is not only ever visible in the log.
     text_summary_path = outdir / f"{label}_ks_text_summary.txt"
     text_summary_path.write_text(
@@ -954,8 +954,8 @@ def analysis(
         )
 
     csv_path, json_path = save_stationarity_summary(summary_records, outdir)
-    kprint(f"Saved Table III summary: {csv_path}")
-    kprint(f"Saved Table III summary: {json_path}")
+    kprint(f"Saved stationarity summary: {csv_path}")
+    kprint(f"Saved stationarity summary: {json_path}")
 
 
 if __name__ == "__main__":

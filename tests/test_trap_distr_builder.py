@@ -8,15 +8,15 @@ import numpy as np
 
 from base.trap_sequence import TrapSequence
 from scripts.trap_distr_builder import (
-    TableIIRow,
+    TrappingSummaryRow,
     plot_trapping_on_axis,
-    save_table_ii_summary,
+    save_trapping_summary,
     summarize_trap_events,
 )
 
 
-def _table_row(gas: str, mu: float) -> TableIIRow:
-    return TableIIRow(
+def _summary_row(gas: str, mu: float) -> TrappingSummaryRow:
+    return TrappingSummaryRow(
         gas=gas,
         classifier="DM",
         mu=mu,
@@ -36,7 +36,7 @@ def _table_row(gas: str, mu: float) -> TableIIRow:
     )
 
 
-def test_table_ii_event_metrics_average_per_trajectory_probability() -> None:
+def test_event_metrics_average_per_trajectory_probability() -> None:
     sequences = [
         TrapSequence(np.ones(2, dtype=int), np.array([0.0, 1.0])),
         TrapSequence(np.ones(4, dtype=int), np.array([0.0, 0.0, 0.0, 1.0])),
@@ -51,7 +51,7 @@ def test_table_ii_event_metrics_average_per_trajectory_probability() -> None:
     assert summary.n_nonzero_events == 2
 
 
-def test_table_ii_uses_positive_tail_exponent() -> None:
+def test_trapping_summary_uses_positive_tail_exponent() -> None:
     rng = np.random.default_rng(42)
     times = (rng.pareto(1.5, 20_000) + 1.0) * 1e-9
     times = times[times <= 1e-6]
@@ -64,11 +64,11 @@ def test_table_ii_uses_positive_tail_exponent() -> None:
     assert fit.mu == -fit.slope
 
 
-def test_table_ii_csv_json_merge_and_replace_rows(tmp_path: Path) -> None:
-    ch4 = _table_row("CH4", 1.452)
-    h2 = _table_row("H2", 2.285)
-    save_table_ii_summary([ch4], tmp_path)
-    csv_path, json_path = save_table_ii_summary([h2], tmp_path)
+def test_trapping_csv_json_merge_and_replace_rows(tmp_path: Path) -> None:
+    ch4 = _summary_row("CH4", 1.452)
+    h2 = _summary_row("H2", 2.285)
+    save_trapping_summary([ch4], tmp_path)
+    csv_path, json_path = save_trapping_summary([h2], tmp_path)
 
     with csv_path.open(encoding="utf-8", newline="") as file:
         csv_rows = list(csv.DictReader(file))
@@ -77,7 +77,7 @@ def test_table_ii_csv_json_merge_and_replace_rows(tmp_path: Path) -> None:
     assert [row["gas"] for row in csv_rows] == ["CH4", "H2"]
     assert [row["mu"] for row in json_rows] == [1.452, 2.285]
 
-    save_table_ii_summary([replace(ch4, mu=1.5)], tmp_path)
+    save_trapping_summary([replace(ch4, mu=1.5)], tmp_path)
     replaced_rows = json.loads(json_path.read_text(encoding="utf-8"))
 
     assert len(replaced_rows) == 2
