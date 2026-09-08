@@ -73,7 +73,7 @@ def test_explicit_step_time_mapping_does_not_require_trajectory() -> None:
     assert mapping.time_ps(160) == 14.0
 
 
-def test_table_iv_summary_is_saved_as_csv_and_json(tmp_path: Path) -> None:
+def test_table_iii_summary_is_saved_as_csv_and_json(tmp_path: Path) -> None:
     result = KSTestResult(
         pairs=[(0, 1), (0, 2)],
         times=np.array([1.5, 2.5, 3.5]),

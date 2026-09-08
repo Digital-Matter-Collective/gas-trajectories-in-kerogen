@@ -121,7 +121,7 @@ Installed command: `gas-traj-dm-search`.
 | Parameter | Required/default | Meaning |
 |---|---|---|
 | `path` | required | Data directory containing `radiuses.npy` and `throat_lengths_weibull_fitter.json`; results go to `errors/find_best_params/`. |
-| `--trajectory-count N` | `100` | Synthetic trajectories evaluated for every `(k,p)` pair. Lower values are useful for experiments but do not reproduce Table I. |
+| `--trajectory-count N` | `100` | Synthetic trajectories evaluated for every `(k,p)` pair. Lower values are useful for experiments but do not reproduce Table IV. |
 | `--trajectory-points N` | `1000` | Points in each synthetic trajectory; must be at least 2. DM cost grows approximately quadratically with this value. |
 | `--seed N` | `42` | Base seed for deterministic NumPy and Python random streams. Must match existing checkpoints. |
 | `--n-jobs N` | `-1` | Joblib worker count; `-1` uses all available logical CPUs and `0` is invalid. |
@@ -134,8 +134,8 @@ Installed command: `gas-traj-find-dm-params`.
 
 | Parameter | Required/default | Meaning |
 |---|---|---|
-| `path` | required | Directory containing the completed `k=..._p=....npz` Table I search results. |
-| `--output-dir DIR` | input `path` | Directory for `table_i_optimized_dm_params.csv` and `.json`. |
+| `path` | required | Directory containing the completed `k=..._p=....npz` Table IV search results. |
+| `--output-dir DIR` | input `path` | Directory for `table_iv_optimized_dm_params.csv` and `.json`. |
 
 ### `sim_algo_check`
 
@@ -156,12 +156,12 @@ Installed command: `gas-traj-trap-distributions`.
 | Parameter | Required/default | Meaning |
 |---|---|---|
 | `path` | required | Data directory containing `trj.gro` and fitted PIL/throat distributions. |
-| `--label LABEL` | required | Gas name stored in the Table III rows and used for plot ranges, normally `CH4` or `H2`. Unknown labels use CH4 plot limits. |
+| `--label LABEL` | required | Gas name stored in the Table II rows and used for plot ranges, normally `CH4` or `H2`. Unknown labels use CH4 plot limits. |
 | `--num N` | `1` | Molecule stride: analyze every Nth trajectory/molecule from `trj.gro`. |
 | `--output FILE` | `<path>/traps/P(t)_loglog.svg` | SVG destination for the trapping-time plot. |
 | `--recompute {DM,SIB,HYB}` | optional, repeatable | Recalculate the named analyzer while reusing compatible caches for the others. |
 | `--force-recompute` | off | Recalculate all DM, SIB, and HYB label/sequence caches; takes precedence over `--recompute`. |
-| `--summary-dir DIR` | `<path>/traps` | Directory for shared Table III CSV/JSON. Pass the same directory for different gases to merge their rows. |
+| `--summary-dir DIR` | `<path>/traps` | Directory for shared Table II CSV/JSON. Pass the same directory for different gases to merge their rows. |
 
 ### `stationarity`
 

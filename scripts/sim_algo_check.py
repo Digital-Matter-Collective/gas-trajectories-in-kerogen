@@ -28,7 +28,7 @@ from processes.trajectory_analyzer.sib import (
     StructureInformedBayesParams,
 )
 from processes.trap_extractor import TRAP_EXTRACTOR_VERSION, TrapExtractor
-from scripts.dm_parameter_search import K_VALUES, table_i_candidate_for_k
+from scripts.dm_parameter_search import K_VALUES, table_iv_candidate_for_k
 from utils.logging_setup import setup_logging
 from utils.utils import create_empirical_cdf, kprint, ps_generate
 
@@ -557,12 +557,12 @@ def _benchmark_manifest(
     }
 
 
-def _save_table_ii_summary(
+def _save_table_i_summary(
     rows: list[dict[str, object]], output_dir: Path
 ) -> tuple[Path, Path]:
-    """Save the synthetic k_est values used in Table II."""
-    csv_path = output_dir / "table_ii_synthetic_k_est.csv"
-    json_path = output_dir / "table_ii_synthetic_k_est.json"
+    """Save the synthetic k_est values used in Table I."""
+    csv_path = output_dir / "table_i_synthetic_k_est.csv"
+    json_path = output_dir / "table_i_synthetic_k_est.json"
     csv_temporary = csv_path.with_name(f".{csv_path.name}.tmp")
     fieldnames = [
         "algorithm",
@@ -649,21 +649,21 @@ def run(
     hybrid_params = {
         k: HybridParams(
             probabilistic_params[k],
-            table_i_candidate_for_k(k).to_params(),
+            table_iv_candidate_for_k(k).to_params(),
             0.3,
         )
         for k in K_VALUES
     }
     np_params = {k: NeymanPearsonParams(0.01) for k in K_VALUES}
     sib_params = probabilistic_params
-    table_ii_rows: list[dict[str, object]] = []
+    table_i_rows: list[dict[str, object]] = []
 
     for k_index, k in enumerate(K_VALUES):
         result_shape = (len(prob_grid), trajectory_count)
         analyzers: list[tuple[Any, Callable[[Any, int, int], None]]] = []
 
         matrix_analyzer = DistanceMatrixAnalyzer(
-            table_i_candidate_for_k(k).to_params()
+            table_iv_candidate_for_k(k).to_params()
         )
         np_analyzer = NeymanPearsonAnalyzer(
             np_params[k], pi_l_fitter, throat_fitter
@@ -850,7 +850,7 @@ def run(
             ("HYB", hybrid_summary),
         ):
             k_est = summary[1]
-            table_ii_rows.append(
+            table_i_rows.append(
                 {
                     "algorithm": algorithm,
                     "k": k,
@@ -866,11 +866,11 @@ def run(
                 }
             )
 
-    table_ii_csv, table_ii_json = _save_table_ii_summary(
-        table_ii_rows, errors_dir
+    table_i_csv, table_i_json = _save_table_i_summary(
+        table_i_rows, errors_dir
     )
-    kprint(f"Saved Table II summary: {table_ii_csv}")
-    kprint(f"Saved Table II summary: {table_ii_json}")
+    kprint(f"Saved Table I summary: {table_i_csv}")
+    kprint(f"Saved Table I summary: {table_i_json}")
 
 
 if __name__ == "__main__":

@@ -34,7 +34,7 @@ class LoadedPairErrors:
 
 
 @dataclass(frozen=True)
-class TableIRow:
+class TableIVRow:
     k: float
     candidate_id: str
     scale_set: tuple[float, ...]
@@ -132,7 +132,7 @@ def _candidate_to_table_row(
     candidate: DMCandidate,
     aggregate_mean_error: float,
     pair_results: list[LoadedPairErrors],
-) -> TableIRow:
+) -> TableIVRow:
     error_metrics = {result.error_metric for result in pair_results}
     source_formats = {result.source_format for result in pair_results}
     if len(error_metrics) != 1 or len(source_formats) != 1:
@@ -150,7 +150,7 @@ def _candidate_to_table_row(
     diagonal_fill_width = (
         diagonal_fill_widths[0] if len(unique_fill_widths) == 1 else None
     )
-    return TableIRow(
+    return TableIVRow(
         k=k,
         candidate_id=candidate.candidate_id,
         scale_set=candidate.scale_set,
@@ -182,7 +182,7 @@ def _candidate_to_table_row(
 
 def select_optimal_parameters(
     pair_errors: Mapping[tuple[float, float], LoadedPairErrors],
-) -> list[TableIRow]:
+) -> list[TableIVRow]:
     """Average over all six p values and select only computed candidates."""
     rows = []
     for k in K_VALUES:
@@ -216,12 +216,12 @@ def select_optimal_parameters(
     return rows
 
 
-def save_table_i_summary(
-    rows: list[TableIRow], output_dir: Path
+def save_table_iv_summary(
+    rows: list[TableIVRow], output_dir: Path
 ) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = output_dir / "table_i_optimized_dm_params.csv"
-    json_path = output_dir / "table_i_optimized_dm_params.json"
+    csv_path = output_dir / "table_iv_optimized_dm_params.csv"
+    json_path = output_dir / "table_iv_optimized_dm_params.json"
     json_rows = [asdict(row) for row in rows]
 
     csv_rows = []
@@ -234,7 +234,7 @@ def save_table_i_summary(
     with csv_path.open("w", encoding="utf-8", newline="") as file:
         writer = csv.DictWriter(
             file,
-            fieldnames=[field.name for field in fields(TableIRow)],
+            fieldnames=[field.name for field in fields(TableIVRow)],
         )
         writer.writeheader()
         writer.writerows(csv_rows)
@@ -244,14 +244,14 @@ def save_table_i_summary(
     return csv_path, json_path
 
 
-def run(path: str | Path, output_dir: Path | None = None) -> list[TableIRow]:
+def run(path: str | Path, output_dir: Path | None = None) -> list[TableIVRow]:
     input_dir = Path(path)
     pair_errors = load_all_pair_errors(input_dir)
     rows = select_optimal_parameters(pair_errors)
     if any(row.source_format.startswith("legacy") for row in rows):
         kprint(
             "WARNING: legacy results have no trajectory-count/seed metadata; "
-            "rerun scripts.errors_params for a fully reproducible Table I."
+            "rerun scripts.errors_params for a fully reproducible Table IV."
         )
 
     for row in rows:
@@ -265,16 +265,16 @@ def run(path: str | Path, output_dir: Path | None = None) -> list[TableIRow]:
             f"mean_error={row.aggregate_mean_error:.6g}"
         )
 
-    csv_path, json_path = save_table_i_summary(rows, output_dir or input_dir)
-    kprint(f"Saved Table I summary: {csv_path}")
-    kprint(f"Saved Table I summary: {json_path}")
+    csv_path, json_path = save_table_iv_summary(rows, output_dir or input_dir)
+    kprint(f"Saved Table IV summary: {csv_path}")
+    kprint(f"Saved Table IV summary: {json_path}")
     return rows
 
 
 if __name__ == "__main__":
     setup_logging()
     parser = argparse.ArgumentParser(
-        description="Aggregate the Table I DM parameter search"
+        description="Aggregate the Table IV DM parameter search"
     )
     parser.add_argument(
         "path", type=Path, help="Directory with find_best_params data"
@@ -282,7 +282,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output-dir",
         type=Path,
-        help="Table I CSV/JSON directory (default: input directory)",
+        help="Table IV CSV/JSON directory (default: input directory)",
     )
     args = parser.parse_args()
 

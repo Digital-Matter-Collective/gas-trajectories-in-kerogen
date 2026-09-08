@@ -22,7 +22,7 @@ from scripts.errors_params import (
 from scripts.find_best_params import (
     LoadedPairErrors,
     load_pair_errors,
-    save_table_i_summary,
+    save_table_iv_summary,
     select_optimal_parameters,
 )
 
@@ -74,7 +74,7 @@ def test_shared_grid_contains_only_the_twelve_article_scale_sets() -> None:
             )
 
 
-def test_selection_averages_all_p_values_and_exports_table_i(
+def test_selection_averages_all_p_values_and_exports_table_iv(
     tmp_path: Path,
 ) -> None:
     expected_indices = ((2, 9), (5, 57), (0, 56))
@@ -90,7 +90,7 @@ def test_selection_averages_all_p_values_and_exports_table_i(
             pair_errors[(k, p)] = _loaded(errors)
 
     rows = select_optimal_parameters(pair_errors)
-    csv_path, json_path = save_table_i_summary(rows, tmp_path)
+    csv_path, json_path = save_table_iv_summary(rows, tmp_path)
     json_rows = json.loads(json_path.read_text(encoding="utf-8"))
 
     assert [row.candidate_id for row in rows] == [

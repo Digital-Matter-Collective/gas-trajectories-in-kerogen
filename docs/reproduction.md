@@ -297,7 +297,7 @@ These files are caches derived from the selected PNMs. Until cache provenance
 is strengthened, do not reuse them after changing PNM inputs or fitting
 parameters. Preserve or move old results before recomputing.
 
-## 6. Table I: DM parameter search
+## 6. Table IV: DM parameter search
 
 The publication profile evaluates 100 trajectories with 1000 points for every
 `(k, p)` pair, using base seed 42 and the deterministic candidate grid:
@@ -337,11 +337,11 @@ gas-traj-find-dm-params "$DATA_DIR/errors/find_best_params"
 python -m scripts.find_best_params "$DATA_DIR/errors/find_best_params"
 ```
 
-The aggregation writes `table_i_optimized_dm_params.csv` and
-`table_i_optimized_dm_params.json` in the input directory. A smaller
-`--trajectory-count` is useful for debugging but is not the Table I profile.
+The aggregation writes `table_iv_optimized_dm_params.csv` and
+`table_iv_optimized_dm_params.json` in the input directory. A smaller
+`--trajectory-count` is useful for debugging but is not the Table IV profile.
 
-## 7. Figures 8 and 13 and Table II: synthetic benchmark
+## 7. Figures 8 and 13 and Table I: synthetic benchmark
 
 Required files at the root of `$DATA_DIR` are:
 
@@ -371,7 +371,7 @@ The command writes:
 
 - `figs/fig08_errors_k=*.svg`: DM/SIB/HYB comparison for Figure 8;
 - `figs/fig13_errors_k=*.svg`: DM/NP/SIB comparison for Figure 13;
-- `errors/table_ii_synthetic_k_est.csv` and `.json`: Table II;
+- `errors/table_i_synthetic_k_est.csv` and `.json`: Table I;
 - `errors/synthetic_benchmark_manifest.json`: seed, grid, and figure series;
 - `errors/trajectories` and `errors/checkpoints`: resumable caches.
 
@@ -392,7 +392,7 @@ edge pairs delimit fully observed zero-duration trap visits and contribute
 are unobserved and are not invented. Counting free and trapped runs instead
 would force `k_est` towards 0.5 because those runs necessarily alternate.
 
-## 8. Table III: trapping-time distributions
+## 8. Table II: trapping-time distributions
 
 Each gas dataset needs `trj.gro`, `pi_l_gamma_fitter.json`, and
 `throat_lengths_weibull_fitter.json`. Define two datasets and one shared
@@ -401,31 +401,31 @@ summary directory:
 ```bash
 export CH4_DIR="/path/to/ch4-dataset"
 export H2_DIR="/path/to/h2-dataset"
-export TABLE_III_DIR="/path/to/table-iii-output"
+export TABLE_II_DIR="/path/to/table-ii-output"
 
 gas-traj-trap-distributions \
   "$CH4_DIR" --label CH4 --num 1 \
   --output "$CH4_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_III_DIR"
+  --summary-dir "$TABLE_II_DIR"
 
 gas-traj-trap-distributions \
   "$H2_DIR" --label H2 --num 2 \
   --output "$H2_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_III_DIR"
+  --summary-dir "$TABLE_II_DIR"
 
 # Without installing the package:
 python -m scripts.trap_distr_builder \
   "$CH4_DIR" --label CH4 --num 1 \
   --output "$CH4_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_III_DIR"
+  --summary-dir "$TABLE_II_DIR"
 
 python -m scripts.trap_distr_builder \
   "$H2_DIR" --label H2 --num 2 \
   --output "$H2_DIR/figs/Pt_loglog.svg" \
-  --summary-dir "$TABLE_III_DIR"
+  --summary-dir "$TABLE_II_DIR"
 ```
 
-The shared directory receives `table_iii_trapping_summary.csv` and `.json`;
+The shared directory receives `table_ii_trapping_summary.csv` and `.json`;
 rows are updated by gas and classifier without removing the other gas. Cached
 step labels and trap sequences are stored under each dataset's `traps/DM`,
 `traps/SIB`, and `traps/HYB` directories.
@@ -441,16 +441,16 @@ To replace only HYB after an algorithm change:
 ```bash
 gas-traj-trap-distributions \
   "$CH4_DIR" --label CH4 --num 1 \
-  --summary-dir "$TABLE_III_DIR" --recompute HYB
+  --summary-dir "$TABLE_II_DIR" --recompute HYB
 # Without installing the package:
 python -m scripts.trap_distr_builder \
   "$CH4_DIR" --label CH4 --num 1 \
-  --summary-dir "$TABLE_III_DIR" --recompute HYB
+  --summary-dir "$TABLE_II_DIR" --recompute HYB
 ```
 
 `--force-recompute` replaces caches for all three classifiers.
 
-## 9. Table IV: PNM stationarity
+## 9. Table III: PNM stationarity
 
 The stationarity command reads `$DATA_DIR/pnm/*_link1.dat` and infers the
 simulation-step-to-time mapping from the first two frames in
@@ -487,7 +487,7 @@ python -m scripts.stationarity \
 ```
 
 The command writes stationarity SVG files and
-`ks_stationarity/table_iv_stationarity_summary.csv` and `.json`. The frame
+`ks_stationarity/table_iii_stationarity_summary.csv` and `.json`. The frame
 at step 25000 is excluded as pre-equilibration; the first later available PNM
 is the baseline.
 
@@ -768,10 +768,10 @@ itself) and `STEP` subsamples molecules.
 | Fig. 11 | §12 (`complexity_estimation`) | Confirmed working; timing protocol is not yet publication-ready |
 | Fig. 12 | `gas-traj-stationarity` | Deterministic summary implemented; PNM data unavailable |
 | Fig. 13 | `gas-traj-synthetic-benchmark` | Deterministic command and SVG output implemented |
-| Table I | `gas-traj-dm-search`, `gas-traj-find-dm-params` | Deterministic, resumable CSV/JSON workflow implemented |
-| Table II | `gas-traj-synthetic-benchmark` | Deterministic CSV/JSON export implemented |
-| Table III | `gas-traj-trap-distributions` | CSV/JSON export implemented; data unavailable |
-| Table IV | `gas-traj-stationarity` | CSV/JSON export implemented; PNM data unavailable |
+| Table IV | `gas-traj-dm-search`, `gas-traj-find-dm-params` | Deterministic, resumable CSV/JSON workflow implemented |
+| Table I | `gas-traj-synthetic-benchmark` | Deterministic CSV/JSON export implemented |
+| Table II | `gas-traj-trap-distributions` | CSV/JSON export implemented; data unavailable |
+| Table III | `gas-traj-stationarity` | CSV/JSON export implemented; PNM data unavailable |
 
 This table is deliberately explicit about incomplete stages. A future
 publication release should replace every “manual” or “unavailable” entry with
@@ -849,7 +849,7 @@ Per-command notes:
   `np.load(..., mmap_mode="r")`, so resident memory stays close to the pages
   actually touched rather than the full trajectory's images.
 - `gas-traj-synthetic-benchmark` (§7, `sim_algo_check.py`, Figures 8/13 and
-  Table II) is single-process and has no `--num-workers` flag. Its cost comes
+  Table I) is single-process and has no `--num-workers` flag. Its cost comes
   from `DistanceMatrixAnalyzer`'s O(N²) distance-matrix computation, repeated
   for every `(k, p, analyzer)` combination: the publication profile is 3 `k`
   values × a 21-point `p` grid (`0.0` to `1.0` in steps of `0.05`) × up to 4

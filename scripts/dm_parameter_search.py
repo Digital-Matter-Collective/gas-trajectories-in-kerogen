@@ -1,4 +1,4 @@
-"""Shared, deterministic parameter grid for the Table I DM search."""
+"""Shared, deterministic parameter grid for the Table IV DM search."""
 
 from __future__ import annotations
 
@@ -141,19 +141,19 @@ def evaluate_trajectory_for_scale(
     return trajectory_index, candidate_errors
 
 
-TABLE_I_CANDIDATE_INDICES = {
+TABLE_IV_CANDIDATE_INDICES = {
     0.1: (2, 33),
     0.5: (1, 57),
     0.9: (0, 52),
 }
 
 
-def table_i_candidate_for_k(k: float) -> DMCandidate:
-    """Return the optimized DM/SIB structural profile reported in Table I."""
+def table_iv_candidate_for_k(k: float) -> DMCandidate:
+    """Return the optimized DM/SIB structural profile reported in Table IV."""
     try:
-        scale_index, parameter_index = TABLE_I_CANDIDATE_INDICES[k]
+        scale_index, parameter_index = TABLE_IV_CANDIDATE_INDICES[k]
     except KeyError as error:
-        raise ValueError(f"No Table I parameter profile for k={k}") from error
+        raise ValueError(f"No Table IV parameter profile for k={k}") from error
     return CANDIDATE_GRID[scale_index][parameter_index]
 
 

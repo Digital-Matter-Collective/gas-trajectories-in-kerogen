@@ -135,11 +135,11 @@ Installing the package provides these supported entry points:
 | Extract dynamic structures | `gas-traj-extract-structures` | structure `.npz` files |
 | Binarize structures | `gas-traj-binarize-structures` | NumPy and raw images |
 | Build distance maps | `gas-traj-distance-maps` | NumPy distance maps |
-| Search DM parameters (Table I) | `gas-traj-dm-search` | checkpoints and search manifest |
-| Aggregate DM search (Table I) | `gas-traj-find-dm-params` | CSV and JSON |
-| Run synthetic validation (Figs. 8, 13; Table II) | `gas-traj-synthetic-benchmark` | SVG, CSV, JSON, manifest |
-| Build trapping distributions (Table III) | `gas-traj-trap-distributions` | SVG, CSV, JSON |
-| Analyze PNM stationarity (Table IV) | `gas-traj-stationarity` | SVG, CSV, JSON |
+| Search DM parameters (Table IV) | `gas-traj-dm-search` | checkpoints and search manifest |
+| Aggregate DM search (Table IV) | `gas-traj-find-dm-params` | CSV and JSON |
+| Run synthetic validation (Figs. 8, 13; Table I) | `gas-traj-synthetic-benchmark` | SVG, CSV, JSON, manifest |
+| Build trapping distributions (Table II) | `gas-traj-trap-distributions` | SVG, CSV, JSON |
+| Analyze PNM stationarity (Table III) | `gas-traj-stationarity` | SVG, CSV, JSON |
 | Build or verify a data manifest | `gas-traj-data-manifest` | SHA-256 JSON manifest |
 
 Use `COMMAND --help` for the complete interface. The data preparation
@@ -197,7 +197,7 @@ resuming cached results.
 
 Runtime depends strongly on trajectory length, number of molecules and frames,
 image resolution, and CPU count. In particular, the DM method constructs
-quadratic-size distance matrices. The full Table I grid and publication
+quadratic-size distance matrices. The full Table IV grid and publication
 synthetic benchmark are research calculations, not quick-start workloads.
 Allow for Numba compilation on the first call and monitor memory before scaling
 up. The reference workflow is CPU-based; no GPU is required.
